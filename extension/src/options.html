@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light" />
+    <title>Cmd+K options</title>
+    <script src="boot.js"></script>
+    <link rel="stylesheet" href="themes.css" />
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Cmd+K</h1>
+      <p class="lede">Press the shortcut on any page. On Chrome's own pages the palette opens from the toolbar instead.</p>
+
+      <section>
+        <h2>Theme</h2>
+        <div class="choices" id="themes" role="radiogroup" aria-label="Theme"></div>
+      </section>
+
+      <section>
+        <h2>Appearance</h2>
+        <div class="choices" id="appearances" role="radiogroup" aria-label="Appearance"></div>
+        <p class="note">Family is a light-only system, so it stays light.</p>
+      </section>
+
+      <section>
+        <h2>Shortcut</h2>
+        <p>Current shortcut: <kbd id="shortcut">not set</kbd></p>
+        <button type="button" id="change-shortcut">Change shortcut</button>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

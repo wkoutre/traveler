@@ -1,6 +1,7 @@
 import { rank } from './fuzzy.js';
 import { PAGES, buildCommands, openTab, setHomeWindow } from './catalog.js';
 import { icon } from './icons.js';
+import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
 const surface = document.documentElement.dataset.surface || 'tab';
 const $ = (id) => document.getElementById(id);
@@ -420,6 +421,143 @@ function say(message) {
   if (message) statusTimer = setTimeout(() => (els.status.textContent = ''), 2600);
 }
 
+// ---- Position -----------------------------------------------------------
+
+// The panel moves inside the overlay's frame, and the palette's own window
+// moves as a whole. The browser places the toolbar popup, so that one stays put.
+const movable = surface !== 'popup';
+let savedPanel = null; // { x, y } as fractions of the viewport, or null for the default spot
+const own = { id: null, last: null, parent: null, quietUntil: 0 };
+
+function placePanel(spot) {
+  if (!spot) {
+    delete els.scrim.dataset.placed;
+    for (const name of ['left', 'top', 'max-height']) els.panel.style.removeProperty(name);
+    return;
+  }
+  els.scrim.dataset.placed = '';
+  els.panel.style.left = `${spot.left}px`;
+  els.panel.style.top = `${spot.top}px`;
+  // Placed low, the panel gets shorter instead of running off the bottom.
+  els.panel.style.maxHeight = `min(520px, calc(100% - ${spot.top + 16}px))`;
+}
+
+async function restorePanel() {
+  ({ positionOverlay: savedPanel = null } = await chrome.storage.local.get('positionOverlay'));
+  placePanel(panelSpot(savedPanel, innerWidth, innerHeight));
+  window.addEventListener('resize', () => placePanel(panelSpot(savedPanel, innerWidth, innerHeight)));
+}
+
+// The window can also be moved by its title bar, which the page never sees as
+// a pointer, so its position is read from the bounds-changed event. The
+// listener lives in this page and goes away with it.
+async function watchWindow() {
+  const current = await chrome.windows.getCurrent();
+  own.id = current.id;
+  own.last = { left: current.left, top: current.top };
+  chrome.windows.onBoundsChanged.addListener((changed) => {
+    if (changed.id === own.id) rememberWindow(changed);
+  });
+}
+
+async function parentWindow() {
+  if (!state.tab) return null;
+  return (own.parent ??= await chrome.windows.get(state.tab.windowId).catch(() => null));
+}
+
+async function rememberWindow(bounds) {
+  if (!own.last || (bounds.left === own.last.left && bounds.top === own.last.top)) return;
+  own.last = { left: bounds.left, top: bounds.top };
+  if (Date.now() < own.quietUntil) return;
+  const parent = await parentWindow();
+  // own.last, not bounds: a newer move may have landed while the parent was looked up.
+  if (parent) await chrome.storage.local.set({ positionWindow: windowOffset(parent, own.last) });
+}
+
+async function resetPosition() {
+  if (surface === 'window') {
+    const parent = await parentWindow();
+    if (parent && own.id) {
+      // Moving back is not a new position to remember.
+      own.quietUntil = Date.now() + 500;
+      await chrome.windows.update(own.id, windowSpot(parent));
+    }
+  } else if (movable) {
+    savedPanel = null;
+    placePanel(null);
+  }
+  await chrome.storage.local.remove(['positionOverlay', 'positionWindow']);
+  return { keep: true, message: 'Palette position reset' };
+}
+
+// Two ways to grab it: the search row outside the text field, or anywhere with Option held.
+function wireDrag() {
+  if (!movable) return;
+  const root = document.documentElement;
+  let drag = null;
+  let frame = 0;
+
+  els.panel.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !event.isPrimary) return;
+    const onGrip = Boolean(event.target.closest('.search')) && event.target !== els.input;
+    if (!event.altKey && !onGrip) return;
+    if (surface === 'window' && !own.last) return;
+    // With Option held, the press must not reach the row, pill or field under it.
+    if (event.altKey) event.preventDefault();
+    const box = els.panel.getBoundingClientRect();
+    drag = {
+      pointer: event.pointerId,
+      // Screen coordinates for the window, which moves under the pointer; client ones for the panel.
+      from: surface === 'window' ? { x: event.screenX, y: event.screenY } : { x: event.clientX, y: event.clientY },
+      base: surface === 'window' ? { ...own.last } : { left: box.left, top: box.top },
+      spot: null,
+    };
+    els.panel.setPointerCapture(event.pointerId);
+  });
+
+  els.panel.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const dx = (surface === 'window' ? event.screenX : event.clientX) - drag.from.x;
+    const dy = (surface === 'window' ? event.screenY : event.clientY) - drag.from.y;
+    // A press that barely moves is a click, not a drag.
+    if (!drag.spot && Math.abs(dx) + Math.abs(dy) < 4) return;
+    root.dataset.dragging = '';
+    const target = { left: drag.base.left + dx, top: drag.base.top + dy };
+    if (surface === 'window') {
+      drag.spot = { left: Math.round(target.left), top: Math.round(target.top) };
+      cancelAnimationFrame(frame);
+      const spot = drag.spot;
+      frame = requestAnimationFrame(() => chrome.windows.update(own.id, spot).catch(() => {}));
+    } else {
+      drag.spot = clampPanel(target, innerWidth, innerHeight);
+      placePanel(drag.spot);
+    }
+  });
+
+  const end = async (event) => {
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const { spot } = drag;
+    drag = null;
+    delete root.dataset.dragging;
+    els.input.focus();
+    if (!spot) return;
+    // The release after a drag is not a click on whatever is under it.
+    const swallow = (click) => click.stopPropagation();
+    window.addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener('click', swallow, { capture: true }));
+    if (surface === 'window') {
+      cancelAnimationFrame(frame);
+      const moved = await chrome.windows.update(own.id, spot).catch(() => null);
+      if (moved) await rememberWindow(moved);
+    } else {
+      savedPanel = panelFractions(spot, innerWidth, innerHeight);
+      await chrome.storage.local.set({ positionOverlay: savedPanel });
+    }
+  };
+  els.panel.addEventListener('pointerup', end);
+  els.panel.addEventListener('pointercancel', end);
+}
+
 // ---- Running ------------------------------------------------------------
 
 const ctx = {
@@ -433,6 +571,7 @@ const ctx = {
     applyPrefs(prefs);
     return { keep: true, message };
   },
+  resetPosition,
 };
 
 function readPrefs() {
@@ -609,6 +748,9 @@ async function start() {
   if (surface === 'window') window.addEventListener('blur', close);
   $('search-icon').append(icon('search'));
   wire();
+  wireDrag();
+  if (surface === 'window') await watchWindow();
+  else if (movable) await restorePanel();
   renderScopes();
   els.panel.hidden = false;
   els.input.focus();

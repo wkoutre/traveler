@@ -40,6 +40,11 @@ body {
 .panel[hidden] {
   display: none;
 }
+/* Dragged somewhere: palette.js sets left, top and max-height. */
+.scrim[data-placed] .panel {
+  position: absolute;
+  width: min(640px, calc(100% - 32px));
+}
 
 /* The toolbar popup, the palette's own window and a plain tab supply their own frame. */
 :root[data-surface='popup'],
@@ -95,6 +100,14 @@ body {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
 }
+:root:not([data-surface='popup']) .search {
+  cursor: grab;
+}
+:root[data-dragging],
+:root[data-dragging] * {
+  cursor: grabbing !important;
+  user-select: none;
+}
 .search-icon {
   display: flex;
   color: var(--text-2);
@@ -132,6 +145,7 @@ body {
   letter-spacing: var(--input-tracking);
   color: var(--text);
   caret-color: var(--accent);
+  cursor: text;
 }
 #input::placeholder {
   color: var(--text-3);

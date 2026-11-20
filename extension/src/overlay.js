@@ -5,9 +5,12 @@ export function toggleOverlay(url) {
   // The element id is only a label; a page that plants the same id changes nothing.
   const ID = '__cmdk_host__';
   try {
-    if (globalThis.__cmdkClose) {
-      globalThis.__cmdkClose();
-      return 'closed';
+    const open = globalThis.__cmdkOpen;
+    if (open) {
+      const stillShown = open.host.isConnected;
+      open.close();
+      // If the page removed the overlay itself, this press is a fresh open, not a toggle.
+      if (stillShown) return 'closed';
     }
     const previous = document.activeElement;
     const host = document.createElement('div');
@@ -28,18 +31,18 @@ export function toggleOverlay(url) {
     };
     function close() {
       window.removeEventListener('message', onMessage);
-      globalThis.__cmdkClose = null;
+      globalThis.__cmdkOpen = null;
       host.remove();
       if (previous && typeof previous.focus === 'function') previous.focus({ preventScroll: true });
     }
-    globalThis.__cmdkClose = close;
+    globalThis.__cmdkOpen = { host, close };
     window.addEventListener('message', onMessage);
     document.documentElement.appendChild(host);
     frame.addEventListener('load', () => frame.focus());
     frame.focus();
     return 'opened';
   } catch {
-    globalThis.__cmdkClose?.();
+    globalThis.__cmdkOpen?.close();
     return 'failed';
   }
 }

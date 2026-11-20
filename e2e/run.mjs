@@ -188,6 +188,21 @@ async function overlaySuite(server) {
   await sleep(150);
   check('and closing still works', !(await paletteFrame(page, id, 200)));
 
+  // A page (or a framework re-rendering <html>) removes the overlay element itself.
+  await fire(sw);
+  await paletteFrame(page, id);
+  await sleep(200);
+  await page.evaluate(() => document.querySelectorAll('#__cmdk_host__').forEach((el) => el.remove()));
+  await sleep(100);
+  await fire(sw);
+  frame = await paletteFrame(page, id, 1000);
+  check('after the page removes the overlay, the next press opens it again', Boolean(frame));
+  if (frame) {
+    await frame.waitForSelector('.row');
+    await page.keyboard.press('Escape');
+    await sleep(150);
+  }
+
   // A hostile page frames the web-accessible URL itself.
   const evil = await browser.newPage();
   await evil.goto(`${base}/plain`);

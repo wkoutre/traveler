@@ -105,3 +105,26 @@ test('the manifest holds only permissions the code uses', () => {
 test('only the palette page is web-accessible', () => {
   assert.deepEqual(manifest.web_accessible_resources.flatMap((r) => r.resources), ['src/palette.html']);
 });
+
+test('closing duplicate tabs asks first and keeps active and pinned tabs', async () => {
+  const removed = [];
+  globalThis.chrome = {
+    tabs: {
+      query: async () => [
+        { id: 1, url: 'https://a.test/', active: false, pinned: false },
+        { id: 2, url: 'https://a.test/', active: false, pinned: false },
+        { id: 3, url: 'https://a.test/', active: true, pinned: false },
+        { id: 4, url: 'https://a.test/', active: false, pinned: true },
+        { id: 5, url: 'https://b.test/', active: false, pinned: false },
+      ],
+      remove: async (ids) => removed.push(...ids),
+    },
+  };
+  const [yes, no] = await commands.find((c) => c.id === 'tabs.closeDuplicates').children();
+  assert.equal(yes.title, 'Close 1 duplicate tab');
+  no.run();
+  assert.deepEqual(removed, []);
+  await yes.run();
+  assert.deepEqual(removed, [2]);
+  delete globalThis.chrome;
+});

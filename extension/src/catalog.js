@@ -240,15 +240,16 @@ function tabCommands() {
       },
     }),
     action('tabs.closeDuplicates', 'Close duplicate tabs', 'close', 'dedupe same url', {
-      run: async () => {
+      children: async () => {
         const seen = new Set();
         const dupes = [];
         for (const t of await chrome.tabs.query({})) {
           if (seen.has(t.url) && !t.active && !t.pinned) dupes.push(t.id);
           seen.add(t.url);
         }
-        await chrome.tabs.remove(dupes);
-        return keep(`Closed ${dupes.length} duplicate ${dupes.length === 1 ? 'tab' : 'tabs'}`);
+        return confirm(`Close ${dupes.length} duplicate ${dupes.length === 1 ? 'tab' : 'tabs'}`, 'Active and pinned tabs stay open', () =>
+          chrome.tabs.remove(dupes),
+        );
       },
     }),
     action('tabs.discard', 'Free memory: discard background tabs', 'bolt', 'sleep suspend unload ram', {
@@ -602,6 +603,7 @@ export function buildCommands() {
 export const GUARDED = [
   'tabs.closeOthers',
   'tabs.closeRight',
+  'tabs.closeDuplicates',
   'win.close',
   'dl.clear',
   'data.clear',

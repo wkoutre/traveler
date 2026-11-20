@@ -21,7 +21,7 @@ It is a Manifest V3 extension written in plain JavaScript, with no dependencies 
 | Cmd+Backspace | Close the highlighted tab |
 | Backspace on an empty field, Esc | Go back one page; Esc at the root closes |
 
-On pages Chrome does not let extensions touch (`chrome://` pages, the Web Store, the PDF viewer) the palette opens as the toolbar popup instead of an overlay.
+On pages the browser does not let extensions touch (`chrome://` pages, the Web Store, the PDF viewer) the palette opens in a small window of its own, centered over the browser window, instead of an overlay. That window closes on Esc, on a second press of the shortcut, or when it loses focus. Clicking the toolbar icon opens the same palette as a popup.
 
 ## What it reaches
 
@@ -43,7 +43,7 @@ No content script is registered and the extension has no host permissions. The s
 ## Safety
 
 - Commands that delete data, close many tabs, or change a privacy, site or extension setting never run from the first Enter. Each ends in a page with an explicit choice and a Cancel row.
-- The palette page is web-accessible so the overlay can frame it, which means any page can also frame it or open it in a tab. It stays blank unless it is the overlay with a one-time token the service worker stored for that key press, or the toolbar popup. The overlay frame sits in a closed shadow root so the page cannot read its URL. A page can still detect that the extension is installed.
+- The palette page is web-accessible so the overlay can frame it, which means any page can also frame it or open it in a tab. It stays blank unless it is the overlay with a one-time token the service worker stored for that key press, the palette's own window with the same kind of token, or the toolbar popup. The overlay frame sits in a closed shadow root so the page cannot read its URL. A page can still detect that the extension is installed.
 - A privacy switch or site permission changed from the palette is marked "set by Cmd+K". Flipping a switch back, or choosing Reset on a site permission, hands the setting back to Chrome instead of leaving the extension in control of it.
 - The extension makes no network requests of its own. Site icons come from Chrome's local favicon cache.
 
@@ -60,6 +60,6 @@ npm test                      # unit tests, Node only
 cd e2e && npm ci && node run.mjs   # browser tests against the installed Chrome
 ```
 
-The browser tests start Chrome with a throwaway profile. Suites: `overlay`, `ui`, `pages` (loads every catalogued `chrome://` URL), `idle` (waits 40 seconds, then checks the service worker has stopped) and `shots` (theme screenshots in `e2e/out/`). Pass suite names to run a subset.
+The browser tests start Chrome with a throwaway profile. Suites: `overlay`, `ui`, `window` (the fallback window on a `chrome://` page), `pages` (loads every catalogued `chrome://` URL), `idle` (waits 40 seconds, then checks the service worker has stopped) and `shots` (theme screenshots in `e2e/out/`). Pass suite names to run a subset.
 
 Chrome grants `activeTab` only on a real key press, which automation cannot send to the shortcut handler. The overlay suite therefore loads a temporary copy of the extension with host access added and fires the command event directly; pressing the real shortcut is a manual check.

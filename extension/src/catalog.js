@@ -114,7 +114,7 @@ function pages(rows, section) {
     keywords: `${keywords} chrome ${section.toLowerCase()}`,
     icon: 'gear',
     url,
-    run: () => chrome.tabs.create({ url }),
+    run: () => openTab({ url }),
   }));
 }
 
@@ -125,6 +125,16 @@ export const PAGES = [
 ];
 
 // ---- Helpers ------------------------------------------------------------
+
+// When the palette runs in its own window, new tabs belong in the browser
+// window the shortcut was pressed in, not next to the palette.
+let homeWindowId;
+export function setHomeWindow(id) {
+  homeWindowId = id;
+}
+export function openTab(props = {}) {
+  return chrome.tabs.create(homeWindowId === undefined ? props : { windowId: homeWindowId, ...props });
+}
 
 const keep = (message) => ({ keep: true, message });
 
@@ -168,7 +178,7 @@ const GROUP_COLORS = ['grey', 'blue', 'red', 'yellow', 'green', 'pink', 'purple'
 
 function tabCommands() {
   return [
-    action('tab.new', 'New tab', 'tab', 'open create', { run: () => chrome.tabs.create({}) }),
+    action('tab.new', 'New tab', 'tab', 'open create', { run: () => openTab({}) }),
     action('tab.close', 'Close tab', 'close', 'remove', { run: (c) => chrome.tabs.remove(c.tab.id) }),
     action('tab.reopen', 'Reopen closed tab', 'undo', 'restore undo close', {
       run: () => chrome.sessions.restore(),
@@ -227,7 +237,7 @@ function tabCommands() {
     }),
     action('tabs.closeOthers', 'Close other tabs', 'close', 'only this', {
       children: async (c) => {
-        const others = (await chrome.tabs.query({ currentWindow: true })).filter((t) => t.id !== c.tab.id && !t.pinned);
+        const others = (await chrome.tabs.query({ windowId: c.tab.windowId })).filter((t) => t.id !== c.tab.id && !t.pinned);
         return confirm(`Close ${others.length} other tabs`, 'Pinned tabs stay open', () =>
           chrome.tabs.remove(others.map((t) => t.id)),
         );
@@ -235,7 +245,7 @@ function tabCommands() {
     }),
     action('tabs.closeRight', 'Close tabs to the right', 'close', '', {
       children: async (c) => {
-        const right = (await chrome.tabs.query({ currentWindow: true })).filter((t) => t.index > c.tab.index);
+        const right = (await chrome.tabs.query({ windowId: c.tab.windowId })).filter((t) => t.index > c.tab.index);
         return confirm(`Close ${right.length} tabs to the right`, '', () => chrome.tabs.remove(right.map((t) => t.id)));
       },
     }),
@@ -432,10 +442,10 @@ function extensionsCommand() {
                 ]
               : []),
             ...(ext.optionsUrl && ext.enabled
-              ? [action('ext.options', 'Open its options', 'gear', '', { run: () => chrome.tabs.create({ url: ext.optionsUrl }) })]
+              ? [action('ext.options', 'Open its options', 'gear', '', { run: () => openTab({ url: ext.optionsUrl }) })]
               : []),
             action('ext.details', 'Open its details page', 'gear', '', {
-              run: () => chrome.tabs.create({ url: `chrome://extensions/?id=${ext.id}` }),
+              run: () => openTab({ url: `chrome://extensions/?id=${ext.id}` }),
             }),
             { id: 'confirm:no', kind: 'action', title: 'Cancel', icon: 'close', run: () => ({ pop: true }) },
           ],
@@ -637,7 +647,7 @@ function paletteCommands() {
       run: () => chrome.runtime.openOptionsPage(),
     }),
     action('palette.shortcut', 'Change the palette shortcut', 'gear', 'keyboard hotkey rebind cmd+k key', {
-      run: () => chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }),
+      run: () => openTab({ url: 'chrome://extensions/shortcuts' }),
     }),
   ];
 }

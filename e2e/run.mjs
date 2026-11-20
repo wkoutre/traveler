@@ -96,6 +96,25 @@ const hostExists = (page) => page.evaluate(() => Boolean(document.getElementById
 const titles = (frame) => frame.$$eval('.row .title', (els) => els.map((e) => e.textContent));
 const activeTitle = (frame) => frame.$eval('.row[aria-selected="true"] .title', (e) => e.textContent).catch(() => null);
 
+const rect = (frame) =>
+  frame.$eval('#panel', (el) => {
+    const r = el.getBoundingClientRect();
+    return { left: Math.round(r.left), top: Math.round(r.top), width: Math.round(r.width) };
+  });
+const center = (frame, selector) =>
+  frame.$eval(selector, (el) => {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  });
+async function drag(page, from, dx, dy, steps = 4) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(from.x + dx, from.y + dy, { steps });
+  await page.mouse.up();
+  await sleep(150);
+}
+const stored = (sw, key) => sw.evaluate(async (key) => (await chrome.storage.local.get(key))[key] ?? null, key);
+
 async function type(page, frame, text) {
   await frame.$eval('#input', (el) => {
     el.value = '';
@@ -155,6 +174,25 @@ async function overlaySuite(server) {
   await page.mouse.click(20, 20);
   await sleep(150);
   check('clicking outside the panel closes', !(await hostExists(page)));
+
+  // A saved position is where the overlay opens, and dragging there saves the new one.
+  await sw.evaluate(() => chrome.storage.local.set({ positionOverlay: { x: 0.3, y: 0.5 } }));
+  await fire(sw);
+  frame = await paletteFrame(page, id);
+  await frame.waitForSelector('.row');
+  await sleep(400);
+  let placed = await rect(frame);
+  check('the overlay opens where it was left', placed.left === 64 && placed.top === 400, JSON.stringify(placed));
+  await drag(page, await center(frame, '#search-icon'), 200, -150);
+  const dragged = await rect(frame);
+  check('dragging the search row moves the overlay panel', dragged.left === 264 && dragged.top === 250, JSON.stringify(dragged));
+  const savedOverlay = await stored(sw, 'positionOverlay');
+  check('and the new position is saved', Math.abs(savedOverlay.x - (264 + 320) / 1280) < 0.002 && Math.abs(savedOverlay.y - 250 / 800) < 0.002, JSON.stringify(savedOverlay));
+  check('a drag does not close the overlay', await hostExists(page));
+  await page.screenshot({ path: path.join(outDir, 'overlay-moved.png') });
+  await page.keyboard.press('Escape');
+  await sleep(150);
+  await sw.evaluate(() => chrome.storage.local.remove('positionOverlay'));
 
   // A second key press elsewhere used to invalidate the first token and strand an inert frame.
   const stolen = await sw.evaluate(async () => {
@@ -409,6 +447,45 @@ async function uiSuite(server) {
   await sleep(200);
   check('Family stays light when dark is selected', (await page.evaluate(() => getComputedStyle(document.querySelector('.panel')).backgroundColor)) === 'rgb(255, 255, 255)');
 
+  // Position.
+  await type(page, frame, '');
+  const home = await rect(frame);
+  check('with nothing saved the panel is centered near the top', home.left === 320 && home.top === 112, JSON.stringify(home));
+  await drag(page, await center(frame, '#search-icon'), 120, 90);
+  let at = await rect(frame);
+  check('dragging the search row moves the panel', at.left === home.left + 120 && at.top === home.top + 90, JSON.stringify(at));
+  check('typing focus stays in the field after a drag', (await page.evaluate(() => document.activeElement?.id)) === 'input');
+  await drag(page, await center(frame, '.footer'), 60, 60);
+  check('a plain drag elsewhere does not move it', JSON.stringify(await rect(frame)) === JSON.stringify(at));
+  await page.keyboard.down('Alt');
+  await drag(page, await center(frame, '.row'), -200, 40);
+  await page.keyboard.up('Alt');
+  const optioned = await rect(frame);
+  check('holding Option drags it from anywhere', optioned.left === at.left - 200 && optioned.top === at.top + 40, JSON.stringify(optioned));
+  check('an Option-drag that starts on a row does not run the row', !page.isClosed() && (await page.$$eval('.crumb', (els) => els.length)) === 0);
+  await drag(page, await center(frame, '#search-icon'), -3000, 3000);
+  at = await rect(frame);
+  check('it cannot be dragged off the screen', at.left === 8 && at.top === 800 - 220, JSON.stringify(at));
+  await drag(page, await center(frame, '#search-icon'), 400, -300);
+  at = await rect(frame);
+  await page.reload();
+  await page.waitForSelector('.row');
+  await sleep(400); // the enter animation shifts the panel a few pixels while it runs
+  check('it reopens where it was left', JSON.stringify(await rect(frame)) === JSON.stringify(at), `${JSON.stringify(await rect(frame))} vs ${JSON.stringify(at)}`);
+  await page.setViewport({ width: 900, height: 600, deviceScaleFactor: 2 });
+  await sleep(200);
+  const shrunk = await rect(frame);
+  check('it stays on screen when the viewport shrinks', shrunk.left >= 8 && shrunk.left + shrunk.width <= 900 - 8 && shrunk.top <= 600 - 220, JSON.stringify(shrunk));
+  await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 2 });
+  await sleep(200);
+  await type(page, frame, 'reset palette position');
+  check('there is a command to reset it', (await activeTitle(frame)) === 'Reset palette position', await activeTitle(frame));
+  await page.keyboard.press('Enter');
+  await sleep(250);
+  check('the reset command centers the open palette', JSON.stringify(await rect(frame)) === JSON.stringify(home), JSON.stringify(await rect(frame)));
+  check('and forgets the saved position', (await stored(sw, 'positionOverlay')) === null);
+  check('and reports it', (await page.$eval('#status', (e) => e.textContent)) === 'Palette position reset');
+
   // Tabs.
   await type(page, frame, 'plain?one');
   const n = await count();
@@ -436,7 +513,8 @@ async function uiSuite(server) {
 // ---- Pages that cannot be scripted: a centered window ---------------------
 async function windowSuite() {
   // The shipped manifest, unmodified: injection into chrome:// fails for real.
-  const { browser, id } = await launch(path.join(here, '../extension'));
+  // Headless Chrome's default screen is 800x600, too small to move a 680x520 window around in.
+  const { browser, id } = await launch(path.join(here, '../extension'), { args: ['--screen-info={1920x1200}'] });
   const sw = await worker(browser, id);
   const page = await browser.newPage();
   await page.goto('chrome://version/');
@@ -495,6 +573,55 @@ async function windowSuite() {
   await third.keyboard.press('Escape').catch(() => {});
   await sleep(400);
   check('Escape closes the window', (await windows()).every((w) => w.type !== 'popup'));
+
+  // Position: the window remembers its offset from the browser window.
+  const bounds = async () => {
+    const all = await windows();
+    return { pop: all.find((w) => w.type === 'popup'), main: all.find((w) => w.urls.includes('chrome://version/')) };
+  };
+  await sw.evaluate(() => chrome.storage.local.set({ positionWindow: { dx: 40, dy: 300 } }));
+  await fire(sw);
+  target = await paletteTarget();
+  const fourth = await target.page();
+  await fourth.waitForSelector('.row');
+  let b = await bounds();
+  check('the window opens at its saved offset from the browser window', b.pop.left === b.main.left + 40 && b.pop.top === b.main.top + 300, JSON.stringify(b.pop));
+  // What dragging the title bar does: the window moves without the page seeing a pointer.
+  await sw.evaluate((id, left, top) => chrome.windows.update(id, { left, top }), b.pop.id, b.pop.left + 60, b.pop.top - 100);
+  await sleep(500);
+  check('moving the window by its title bar saves the new offset', JSON.stringify(await stored(sw, 'positionWindow')) === JSON.stringify({ dx: 100, dy: 200 }), JSON.stringify(await stored(sw, 'positionWindow')));
+  b = await bounds();
+  await drag(fourth, await center(fourth.mainFrame(), '#search-icon'), 40, 30, 1);
+  await sleep(500);
+  const after2 = await bounds();
+  check('dragging the search row moves the window itself', after2.pop.left === b.pop.left + 40 && after2.pop.top === b.pop.top + 30, `${JSON.stringify(b.pop)} -> ${JSON.stringify(after2.pop)}`);
+  check('and saves that offset', JSON.stringify(await stored(sw, 'positionWindow')) === JSON.stringify({ dx: 140, dy: 230 }), JSON.stringify(await stored(sw, 'positionWindow')));
+  check('a drag does not close the window', (await windows()).some((w) => w.type === 'popup'));
+  await type(fourth, fourth.mainFrame(), 'reset palette position');
+  await fourth.keyboard.press('Enter');
+  await sleep(500);
+  b = await bounds();
+  const off = Math.abs(b.pop.left + b.pop.width / 2 - (b.main.left + b.main.width / 2));
+  check('the reset command centers the open window', off <= 2 && b.pop.top < b.main.top + b.main.height / 2, JSON.stringify(b.pop));
+  check('and forgets the saved offset', (await stored(sw, 'positionWindow')) === null);
+  await fourth.keyboard.press('Escape').catch(() => {});
+  await sleep(400);
+
+  // A saved offset that no screen can show must not stop the palette opening.
+  await sw.evaluate(() => chrome.storage.local.set({ positionWindow: { dx: 90000, dy: 90000 } }));
+  await fire(sw);
+  target = await paletteTarget();
+  check('a saved offset far off every screen still opens the window', Boolean(target));
+  if (target) {
+    const fifth = await target.page();
+    await fifth.waitForSelector('.row');
+    b = await bounds();
+    const drift = Math.abs(b.pop.left + b.pop.width / 2 - (b.main.left + b.main.width / 2));
+    check('and falls back to the centered spot', drift <= 2, JSON.stringify({ left: b.pop.left, top: b.pop.top }));
+    await fifth.keyboard.press('Escape').catch(() => {});
+    await sleep(400);
+  }
+  await sw.evaluate(() => chrome.storage.local.remove('positionWindow'));
 
   const stray = await browser.newPage();
   await stray.goto(`chrome-extension://${id}/src/palette.html?mode=window#guess`);

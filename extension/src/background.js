@@ -1,4 +1,5 @@
 import { toggleOverlay } from './overlay.js';
+import { WINDOW, windowSpot } from './position.js';
 
 // The only listener. Nothing else wakes the service worker, and no content
 // script is registered, so the extension costs nothing until the shortcut fires.
@@ -15,8 +16,6 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
   }
 });
 
-const WINDOW = { width: 680, height: 520 };
-
 async function toggleWindow(tab) {
   try {
     const { paletteWindow } = await chrome.storage.session.get('paletteWindow');
@@ -30,15 +29,19 @@ async function toggleWindow(tab) {
     const token = crypto.randomUUID();
     await chrome.storage.session.set({ [`overlay:${token}`]: true });
     const query = new URLSearchParams({ mode: 'window', ...(tab?.id ? { tab: String(tab.id) } : {}) });
-    const created = await chrome.windows.create({
+    const { positionWindow } = await chrome.storage.local.get('positionWindow');
+    const frame = {
       url: `${chrome.runtime.getURL('src/palette.html')}?${query}#${token}`,
       type: 'popup',
       focused: true,
       width: WINDOW.width,
       height: WINDOW.height,
-      left: Math.round(parent.left + (parent.width - WINDOW.width) / 2),
-      top: Math.round(parent.top + Math.max(60, (parent.height - WINDOW.height) * 0.3)),
-    });
+    };
+    // Chrome refuses bounds that are mostly off every screen, which a saved
+    // offset becomes once a monitor is unplugged. Then the default spot is used.
+    const created = await chrome.windows
+      .create({ ...frame, ...windowSpot(parent, positionWindow) })
+      .catch(() => chrome.windows.create({ ...frame, ...windowSpot(parent) }));
     await chrome.storage.session.set({ paletteWindow: created.id });
     return true;
   } catch {

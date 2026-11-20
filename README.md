@@ -20,8 +20,11 @@ It is a Manifest V3 extension written in plain JavaScript, with no dependencies 
 | Tab, Shift+Tab | Switch scope: All, Tabs, Actions, Settings, Bookmarks, History |
 | Cmd+Backspace | Close the highlighted tab |
 | Backspace on an empty field, Esc | Go back one page; Esc at the root closes |
+| Drag the search row, or Option-drag anywhere | Move the palette |
 
 On pages the browser does not let extensions touch (`chrome://` pages, the Web Store, the PDF viewer) the palette opens in a small window of its own, centered over the browser window, instead of an overlay. That window closes on Esc, on a second press of the shortcut, or when it loses focus. Clicking the toolbar icon opens the same palette as a popup.
+
+The palette opens where you last left it. The overlay remembers its place as a share of the page, so it stays put when the browser is resized; the palette's own window remembers its offset from the browser window, and dragging its title bar counts too. The command "Reset palette position" puts both back in the center. The toolbar popup is placed by the browser and does not move.
 
 ## What it reaches
 

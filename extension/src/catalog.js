@@ -643,6 +643,10 @@ function paletteCommands() {
         run: (c) => c.setPrefs({ appearance: id }, `Appearance: ${name}`),
       }),
     ),
+    action('palette.resetPosition', 'Reset palette position', 'palette', 'center move drag placement location default', {
+      subtitle: 'Drag the search row, or hold Option and drag anywhere, to move it',
+      run: (c) => c.resetPosition(),
+    }),
     action('palette.options', 'Cmd+K options', 'gear', 'settings preferences palette', {
       run: () => chrome.runtime.openOptionsPage(),
     }),

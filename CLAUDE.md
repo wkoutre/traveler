@@ -17,7 +17,7 @@ A Cmd+K command palette for Chrome: MV3, plain JavaScript, no dependencies, no b
 - A new permission needs a line in the `evidence` map in `tests/catalog.test.js`; an unused one fails the test.
 - Verify a new `chrome://` URL with `node run.mjs pages` in `e2e/`. Chrome renames and removes these between versions.
 - Theme values come from the design system's token files. Mark anything the system does not define with an `addition` comment.
-- In `catalog.js` and `palette.js`, open tabs with `openTab()`, never `chrome.tabs.create` directly, and scope tab queries with `windowId: c.tab.windowId`, never `currentWindow`: in the palette's own window the "current" window is the palette.
+- In `catalog.js` and `palette.js`, open tabs with `openTab()`, never `chrome.tabs.create` directly. In `catalog.js`, scope tab queries with `windowId: c.tab.windowId`, never `currentWindow`. In the palette's own window the "current" window is the palette; `activeTab()` in `palette.js` is the one place that resolves which tab the user meant.
 - No network requests, no remote code, no `innerHTML` with page or user data.
 
 ## Tests

@@ -156,6 +156,38 @@ async function overlaySuite(server) {
   await sleep(150);
   check('clicking outside the panel closes', !(await hostExists(page)));
 
+  // A second key press elsewhere used to invalidate the first token and strand an inert frame.
+  const stolen = await sw.evaluate(async () => {
+    const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    chrome.commands.onCommand.dispatch('open-palette', tab);
+    // Take the token away before the frame can redeem it.
+    for (let i = 0; i < 2000; i++) {
+      const keys = Object.keys(await chrome.storage.session.get(null)).filter((k) => k.startsWith('overlay:'));
+      if (keys.length) {
+        await chrome.storage.session.remove(keys);
+        return true;
+      }
+    }
+    return false;
+  });
+  check('test setup: the token was removed before use', stolen);
+  await sleep(600);
+  check('an overlay whose token is not valid removes itself', !(await hostExists(page)));
+
+  // A page plants an element with the overlay's id.
+  await page.evaluate(() => {
+    const fake = document.createElement('div');
+    fake.id = '__cmdk_host__';
+    document.body.append(fake);
+  });
+  await fire(sw);
+  frame = await paletteFrame(page, id);
+  check('a page-planted element with the overlay id does not block opening', Boolean(frame));
+  await frame.waitForSelector('.row');
+  await page.keyboard.press('Escape');
+  await sleep(150);
+  check('and closing still works', !(await paletteFrame(page, id, 200)));
+
   // A hostile page frames the web-accessible URL itself.
   const evil = await browser.newPage();
   await evil.goto(`${base}/plain`);
@@ -171,6 +203,13 @@ async function overlaySuite(server) {
     const inert = framed ? await framed.evaluate(() => document.getElementById('panel').hidden && !document.querySelector('.row')) : true;
     check(`a page framing the palette with ${label} gets nothing`, inert);
   }
+  const [opened] = await Promise.all([
+    new Promise((resolve) => browser.once('targetcreated', (t) => resolve(t.page()))),
+    evil.evaluate((src) => void window.open(src), `chrome-extension://${id}/src/palette.html`),
+  ]);
+  await sleep(600);
+  check('a page opening the palette in a new tab gets nothing', await opened.evaluate(() => document.getElementById('panel').hidden && !document.querySelector('.row')));
+  await opened.close();
   await evil.close();
 
   if (want('shots')) await shots(browser, id, sw, base);
@@ -236,6 +275,8 @@ async function uiSuite(server) {
     await chrome.tabs.create({ url: `${base}/plain?one`, active: false });
     await chrome.tabs.create({ url: `${base}/plain?two`, active: false });
   }, base);
+  // The plain-tab surface only renders with this flag, which web pages cannot set.
+  await sw.evaluate(() => chrome.storage.session.set({ devTab: true }));
   const page = await browser.newPage();
   await page.goto(`chrome-extension://${id}/src/palette.html`);
   await page.waitForSelector('.row');
@@ -328,7 +369,13 @@ async function uiSuite(server) {
   const after = await sw.evaluate(async () => (await chrome.privacy.websites.doNotTrackEnabled.get({})).value);
   check('confirming flips the switch', after === !before, `${before} -> ${after}`);
   await type(page, frame, 'do not track');
-  check('the list shows the new state after going back', (await frame.$eval('.row .subtitle', (e) => e.textContent)) === (after ? 'On' : 'Off'));
+  check('the list shows the new state, marked as set by the palette', (await frame.$eval('.row .subtitle', (e) => e.textContent)) === `${after ? 'On' : 'Off'} · set by Cmd+K`);
+  await page.keyboard.press('Enter');
+  await sleep(150);
+  await page.keyboard.press('Enter');
+  await sleep(400);
+  const restored = await sw.evaluate(() => chrome.privacy.websites.doNotTrackEnabled.get({}));
+  check('flipping it back releases control to the user', restored.value === before && restored.levelOfControl === 'controllable_by_this_extension', JSON.stringify(restored));
   await page.keyboard.press('Escape');
   await sleep(100);
 
@@ -357,7 +404,10 @@ async function uiSuite(server) {
   check('Cmd+Backspace closes the highlighted tab and keeps the palette open', (await count()) === n - 1 && !page.isClosed());
   await type(page, frame, 'new tab');
   check('the exact command ranks first', (await activeTitle(frame)) === 'New tab', await activeTitle(frame));
-  await page.keyboard.press('Enter');
+  // The palette tab closes itself on key down, so the key-up can find its target gone.
+  await page.keyboard.press('Enter').catch((error) => {
+    if (!/Target closed/.test(error.message)) throw error;
+  });
   await sleep(400);
   check('running a command from a tab closes the palette tab', page.isClosed());
   check('the command ran', (await count()) === n - 1, `${await count()} tabs`);

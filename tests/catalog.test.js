@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES } from '../extension/src/catalog.js';
+import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES, flipPrivacy, setSiteRule, resetSiteRule, heldSiteRule } from '../extension/src/catalog.js';
 import { ICON_NAMES } from '../extension/src/icons.js';
 
 const commands = buildCommands();
@@ -126,5 +126,77 @@ test('closing duplicate tabs asks first and keeps active and pinned tabs', async
   assert.deepEqual(removed, []);
   await yes.run();
   assert.deepEqual(removed, [2]);
+  delete globalThis.chrome;
+});
+
+// A fake chrome.types.ChromeSetting: the extension's value overrides the
+// user's until cleared, as Chrome documents.
+function fakeSetting(userValue) {
+  let own;
+  return {
+    calls: [],
+    async get() {
+      return own === undefined
+        ? { value: userValue, levelOfControl: 'controllable_by_this_extension' }
+        : { value: own, levelOfControl: 'controlled_by_this_extension' };
+    },
+    async set({ value }) {
+      this.calls.push(`set:${value}`);
+      own = value;
+    },
+    async clear() {
+      this.calls.push('clear');
+      own = undefined;
+    },
+  };
+}
+
+test('flipping a privacy switch back to the user\'s own value releases control', async () => {
+  const setting = fakeSetting(false);
+  await flipPrivacy(setting);
+  assert.deepEqual(await setting.get(), { value: true, levelOfControl: 'controlled_by_this_extension' });
+  await flipPrivacy(setting);
+  assert.deepEqual(await setting.get(), { value: false, levelOfControl: 'controllable_by_this_extension' });
+  assert.deepEqual(setting.calls, ['set:true', 'clear']);
+});
+
+test('flipping keeps control only when the user\'s own value differs from the target', async () => {
+  const setting = fakeSetting(true);
+  await setting.set({ value: true }); // held by the extension at the same value the user has
+  setting.calls.length = 0;
+  await flipPrivacy(setting);
+  assert.equal((await setting.get()).value, false);
+  assert.deepEqual(setting.calls, ['clear', 'set:false']);
+});
+
+function fakeSiteChrome() {
+  const rules = {}; // type -> pattern -> setting, as held by the extension
+  const store = {};
+  const api = (type) => ({
+    set: async ({ primaryPattern, setting }) => ((rules[type] ??= {})[primaryPattern] = setting),
+    clear: async () => (rules[type] = {}),
+  });
+  return {
+    rules,
+    chrome: {
+      contentSettings: { javascript: api('javascript'), images: api('images') },
+      storage: { local: { get: async (k) => ({ [k]: store[k] }), set: async (o) => Object.assign(store, o) } },
+    },
+  };
+}
+
+test('resetting a site permission drops that one rule and keeps the others', async () => {
+  const fake = fakeSiteChrome();
+  globalThis.chrome = fake.chrome;
+  await setSiteRule('javascript', 'https://a.test/*', 'block');
+  await setSiteRule('javascript', 'https://b.test/*', 'block');
+  await setSiteRule('images', 'https://a.test/*', 'block');
+  assert.equal(await heldSiteRule('javascript', 'https://a.test/*'), 'block');
+  await resetSiteRule('javascript', 'https://a.test/*');
+  assert.deepEqual(fake.rules, {
+    javascript: { 'https://b.test/*': 'block' },
+    images: { 'https://a.test/*': 'block' },
+  });
+  assert.equal(await heldSiteRule('javascript', 'https://a.test/*'), undefined);
   delete globalThis.chrome;
 });

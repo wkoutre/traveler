@@ -17,7 +17,7 @@ async function openOverlay(tab) {
   if (!tab?.id) return false;
   try {
     const token = crypto.randomUUID();
-    await chrome.storage.session.set({ overlayToken: token });
+    await chrome.storage.session.set({ [`overlay:${token}`]: true });
     const url = `${chrome.runtime.getURL('src/palette.html')}?mode=overlay#${token}`;
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId: tab.id },

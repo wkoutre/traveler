@@ -58,16 +58,26 @@ const state = {
 
 // ---- Opening and closing ------------------------------------------------
 
-// The overlay URL is web-accessible so a page can frame it. It only renders
-// when it carries the one-time token the service worker stored for this open;
-// every other surface must be a top-level extension page.
+// palette.html is web-accessible so the overlay can frame it, which also lets
+// any page frame it or open it in a tab. It renders in three cases only:
+//   overlay  the URL carries a one-time token the service worker stored for this key press
+//   popup    it is the toolbar popup (top-level, and not a tab)
+//   tab      a developer or test set `devTab` in session storage, which pages cannot reach
 async function authorized() {
-  if (surface !== 'overlay') return window.top === window;
-  const { overlayToken } = await chrome.storage.session.get('overlayToken');
-  const ok = Boolean(overlayToken) && location.hash.slice(1) === overlayToken;
-  if (ok) await chrome.storage.session.remove('overlayToken');
-  history.replaceState(null, '', location.pathname + location.search);
-  return ok;
+  if (surface === 'overlay') {
+    const key = `overlay:${location.hash.slice(1)}`;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (key === 'overlay:') return false;
+    const stored = await chrome.storage.session.get(key);
+    if (stored[key] !== true) return false;
+    await chrome.storage.session.remove(key);
+    return true;
+  }
+  if (window.top !== window) return false;
+  const tab = await chrome.tabs.getCurrent();
+  if (surface === 'popup' && !tab) return true;
+  const { devTab } = await chrome.storage.session.get('devTab');
+  return devTab === true;
 }
 
 function close() {
@@ -575,13 +585,21 @@ function wire() {
 }
 
 async function start() {
-  if (!(await authorized())) return;
+  if (!(await authorized())) {
+    // Never leave an inert full-page frame over the tab.
+    if (surface === 'overlay') close();
+    return;
+  }
   $('search-icon').append(icon('search'));
   wire();
   renderScopes();
   els.panel.hidden = false;
   els.input.focus();
   await loadContext();
+  // Show the shortcut as it is bound now, since it can be changed in Chrome.
+  const bound = (await chrome.commands.getAll()).find((c) => c.name === 'open-palette')?.shortcut;
+  const shortcut = state.commands.find((c) => c.id === 'palette.shortcut');
+  if (shortcut) shortcut.subtitle = bound ? `Now ${bound}` : 'Not set';
   refresh();
   // Storage is the source of truth; localStorage is only the pre-paint mirror.
   const { prefs } = await chrome.storage.local.get('prefs');

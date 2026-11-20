@@ -466,6 +466,21 @@ export const PRIVACY_SETTINGS = [
   ['network', 'networkPredictionEnabled', 'Preload pages'],
 ];
 
+// Chrome keeps a value an extension sets until that extension clears it, and
+// shows the setting as controlled by the extension meanwhile. So when the
+// switch is already ours, let go first; set again only if the user's own
+// value is not the one wanted.
+export async function flipPrivacy(setting) {
+  const { value, levelOfControl } = await setting.get({});
+  const target = !value;
+  if (levelOfControl === 'controlled_by_this_extension') {
+    await setting.clear({});
+    if ((await setting.get({})).value === target) return target;
+  }
+  await setting.set({ value: target });
+  return target;
+}
+
 function privacyCommand() {
   return action('privacy.toggles', 'Privacy switches', 'shield', 'do not track safe browsing autofill preload toggle', {
     children: async () => {
@@ -474,16 +489,17 @@ function privacyCommand() {
         const setting = chrome.privacy?.[ns]?.[key];
         if (!setting) continue;
         const { value, levelOfControl } = await setting.get({});
-        const locked = !['controllable_by_this_extension', 'controlled_by_this_extension'].includes(levelOfControl);
+        const ours = levelOfControl === 'controlled_by_this_extension';
+        const locked = !ours && levelOfControl !== 'controllable_by_this_extension';
         rows.push(
           action(`privacy.${key}`, title, 'shield', value ? 'on' : 'off', {
-            subtitle: `${value ? 'On' : 'Off'}${locked ? ' · managed elsewhere' : ''}`,
+            subtitle: `${value ? 'On' : 'Off'}${locked ? ' · managed elsewhere' : ours ? ' · set by Cmd+K' : ''}`,
             children: () =>
               locked
                 ? [action('privacy.locked', 'This switch is controlled by policy or another extension', 'close', '', { run: () => ({ pop: true }) })]
                 : confirm(`Turn ${value ? 'off' : 'on'}: ${title}`, '', async () => {
-                    await setting.set({ value: !value });
-                    return { pop: true, message: `${title} is ${value ? 'off' : 'on'}` };
+                    const now = await flipPrivacy(setting);
+                    return { pop: true, message: `${title} is ${now ? 'on' : 'off'}` };
                   }),
           }),
         );
@@ -507,6 +523,35 @@ export const SITE_SETTINGS = [
   ['clipboard', 'Clipboard', ['allow', 'ask', 'block']],
 ];
 
+// chrome.contentSettings can only clear every rule of a type at once, and
+// cannot list the rules an extension holds. The rules set from the palette
+// are therefore recorded, so one can be dropped and the rest put back.
+async function siteRules() {
+  return (await chrome.storage.local.get('siteRules')).siteRules || {};
+}
+
+export async function heldSiteRule(type, pattern) {
+  return (await siteRules())[type]?.[pattern];
+}
+
+export async function setSiteRule(type, pattern, value) {
+  await chrome.contentSettings[type].set({ primaryPattern: pattern, setting: value });
+  const rules = await siteRules();
+  rules[type] = { ...rules[type], [pattern]: value };
+  await chrome.storage.local.set({ siteRules: rules });
+}
+
+export async function resetSiteRule(type, pattern) {
+  const rules = await siteRules();
+  const { [pattern]: dropped, ...rest } = rules[type] || {};
+  await chrome.contentSettings[type].clear({});
+  for (const [p, value] of Object.entries(rest)) {
+    await chrome.contentSettings[type].set({ primaryPattern: p, setting: value });
+  }
+  rules[type] = rest;
+  await chrome.storage.local.set({ siteRules: rules });
+}
+
 const VALUE_LABEL = { allow: 'Allow', block: 'Block', ask: 'Ask', session_only: 'Clear on exit' };
 
 function siteSettingsCommand() {
@@ -526,9 +571,10 @@ function siteSettingsCommand() {
         const setting = chrome.contentSettings?.[key];
         if (!setting) continue;
         const { setting: current } = await setting.get({ primaryUrl: c.tab.url });
+        const held = await heldSiteRule(key, pattern);
         rows.push(
           action(`site.${key}`, title, 'shield', current, {
-            subtitle: `${VALUE_LABEL[current] || current} on ${origin.hostname}`,
+            subtitle: `${VALUE_LABEL[current] || current} on ${origin.hostname}${held ? ' · set by Cmd+K' : ''}`,
             children: () => [
               ...values
                 .filter((v) => v !== current)
@@ -536,11 +582,21 @@ function siteSettingsCommand() {
                   action(`site.${key}.${v}`, `${VALUE_LABEL[v]} ${title.toLowerCase()} on ${origin.hostname}`, 'check', '', {
                     danger: v === 'allow',
                     run: async () => {
-                      await setting.set({ primaryPattern: pattern, setting: v });
+                      await setSiteRule(key, pattern, v);
                       return { pop: true, message: `${title}: ${VALUE_LABEL[v]}` };
                     },
                   }),
                 ),
+              ...(held
+                ? [
+                    action(`site.${key}.reset`, `Reset ${title.toLowerCase()} on ${origin.hostname} to Chrome's setting`, 'undo', '', {
+                      run: async () => {
+                        await resetSiteRule(key, pattern);
+                        return { pop: true, message: `${title}: reset` };
+                      },
+                    }),
+                  ]
+                : []),
               { id: 'confirm:no', kind: 'action', title: 'Cancel', icon: 'close', run: () => ({ pop: true }) },
             ],
           }),
@@ -580,7 +636,7 @@ function paletteCommands() {
     action('palette.options', 'Cmd+K options', 'gear', 'settings preferences palette', {
       run: () => chrome.runtime.openOptionsPage(),
     }),
-    action('palette.shortcut', 'Change the Cmd+K shortcut', 'gear', 'keyboard hotkey rebind', {
+    action('palette.shortcut', 'Change the palette shortcut', 'gear', 'keyboard hotkey rebind cmd+k key', {
       run: () => chrome.tabs.create({ url: 'chrome://extensions/shortcuts' }),
     }),
   ];

@@ -1,11 +1,12 @@
 // Injected into the active tab when the shortcut fires. It must be
 // self-contained: chrome.scripting serializes this one function.
 export function toggleOverlay(url) {
+  // State lives on the isolated world's global, which the page cannot reach.
+  // The element id is only a label; a page that plants the same id changes nothing.
   const ID = '__cmdk_host__';
   try {
-    const existing = document.getElementById(ID);
-    if (existing) {
-      existing.__cmdkClose?.();
+    if (globalThis.__cmdkClose) {
+      globalThis.__cmdkClose();
       return 'closed';
     }
     const previous = document.activeElement;
@@ -27,16 +28,18 @@ export function toggleOverlay(url) {
     };
     function close() {
       window.removeEventListener('message', onMessage);
+      globalThis.__cmdkClose = null;
       host.remove();
       if (previous && typeof previous.focus === 'function') previous.focus({ preventScroll: true });
     }
-    host.__cmdkClose = close;
+    globalThis.__cmdkClose = close;
     window.addEventListener('message', onMessage);
     document.documentElement.appendChild(host);
     frame.addEventListener('load', () => frame.focus());
     frame.focus();
     return 'opened';
   } catch {
+    globalThis.__cmdkClose?.();
     return 'failed';
   }
 }

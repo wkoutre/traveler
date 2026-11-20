@@ -8,7 +8,7 @@ It is a Manifest V3 extension written in plain JavaScript, with no dependencies 
 
 1. Open `chrome://extensions` and turn on Developer mode.
 2. Choose "Load unpacked" and select the `extension/` folder.
-3. Press Cmd+K. If Chrome did not assign the shortcut (another extension may hold it), set it at `chrome://extensions/shortcuts`.
+3. Press Cmd+K. To use a different shortcut, or if Chrome did not assign this one because another extension holds it, set it at `chrome://extensions/shortcuts` (the palette's "Change the palette shortcut" command opens that page). Chrome gives extensions no way to set their own shortcut.
 
 ## Use
 
@@ -43,7 +43,8 @@ No content script is registered and the extension has no host permissions. The s
 ## Safety
 
 - Commands that delete data, close many tabs, or change a privacy, site or extension setting never run from the first Enter. Each ends in a page with an explicit choice and a Cancel row.
-- The palette page is web-accessible so the overlay can frame it. It renders only when its URL carries a one-time token the service worker stored for that key press, and the frame sits in a closed shadow root so the page cannot read the URL.
+- The palette page is web-accessible so the overlay can frame it, which means any page can also frame it or open it in a tab. It stays blank unless it is the overlay with a one-time token the service worker stored for that key press, or the toolbar popup. The overlay frame sits in a closed shadow root so the page cannot read its URL. A page can still detect that the extension is installed.
+- A privacy switch or site permission changed from the palette is marked "set by Cmd+K". Flipping a switch back, or choosing Reset on a site permission, hands the setting back to Chrome instead of leaving the extension in control of it.
 - The extension makes no network requests of its own. Site icons come from Chrome's local favicon cache.
 
 ## Themes

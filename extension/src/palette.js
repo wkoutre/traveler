@@ -1,5 +1,5 @@
 import { rank } from './fuzzy.js';
-import { PAGES, buildCommands } from './catalog.js';
+import { PAGES, buildCommands, openTab, setHomeWindow } from './catalog.js';
 import { icon } from './icons.js';
 
 const surface = document.documentElement.dataset.surface || 'tab';
@@ -61,10 +61,12 @@ const state = {
 // palette.html is web-accessible so the overlay can frame it, which also lets
 // any page frame it or open it in a tab. It renders in three cases only:
 //   overlay  the URL carries a one-time token the service worker stored for this key press
+//   window   the same token, and it is not framed
 //   popup    it is the toolbar popup (top-level, and not a tab)
 //   tab      a developer or test set `devTab` in session storage, which pages cannot reach
 async function authorized() {
-  if (surface === 'overlay') {
+  if (surface === 'overlay' || surface === 'window') {
+    if (surface === 'window' && window.top !== window) return false;
     const key = `overlay:${location.hash.slice(1)}`;
     history.replaceState(null, '', location.pathname + location.search);
     if (key === 'overlay:') return false;
@@ -116,7 +118,7 @@ function urlItem(kind, id, title, url, extra = {}) {
     subtitle: prettyUrl(url),
     keywords: url,
     favicon: url,
-    run: () => chrome.tabs.create({ url }),
+    run: () => openTab({ url }),
     ...extra,
   };
 }
@@ -125,16 +127,29 @@ function prettyUrl(url = '') {
   return url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
 }
 
+// In its own window the palette acts on the tab the shortcut was pressed in,
+// which the service worker passes along, and never lists itself.
+const originTabId = Number(new URLSearchParams(location.search).get('tab')) || null;
+let ownTabId = null;
+
+async function activeTab() {
+  if (surface !== 'window') return (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+  ownTabId ??= (await chrome.tabs.getCurrent())?.id ?? null;
+  const origin = originTabId ? await chrome.tabs.get(originTabId).catch(() => null) : null;
+  if (origin) setHomeWindow(origin.windowId);
+  return origin;
+}
+
 async function loadContext() {
-  const [[active], tabs, closed, reading] = await Promise.all([
-    chrome.tabs.query({ active: true, currentWindow: true }),
+  const [active, tabs, closed, reading] = await Promise.all([
+    activeTab(),
     chrome.tabs.query({}),
     chrome.sessions.getRecentlyClosed({ maxResults: 25 }).catch(() => []),
     chrome.readingList.query({}).catch(() => []),
   ]);
   state.tab = active || null;
   state.tabs = tabs
-    .filter((t) => !(surface === 'tab' && t.url === location.href))
+    .filter((t) => !(surface === 'tab' && t.url === location.href) && t.id !== ownTabId)
     .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))
     .map(tabItem);
   state.closed = closed
@@ -173,14 +188,14 @@ function webItems(query) {
   const looksLikeUrl = /^[\w-]+(\.[\w-]+)+(\/\S*)?$/.test(query) || /^https?:\/\//.test(query);
   if (looksLikeUrl) {
     const url = /^https?:\/\//.test(query) ? query : `https://${query}`;
-    items.push({ id: 'web:open', kind: 'web', title: `Open ${query}`, icon: 'globe', run: () => chrome.tabs.create({ url }) });
+    items.push({ id: 'web:open', kind: 'web', title: `Open ${query}`, icon: 'globe', run: () => openTab({ url }) });
   }
   items.push({
     id: 'web:search',
     kind: 'web',
     title: `Search the web for “${query}”`,
     icon: 'search',
-    run: () => chrome.tabs.create({ url: `https://www.google.com/search?q=${encodeURIComponent(query)}` }),
+    run: () => openTab({ url: `https://www.google.com/search?q=${encodeURIComponent(query)}` }),
   });
   return items;
 }
@@ -590,6 +605,8 @@ async function start() {
     if (surface === 'overlay') close();
     return;
   }
+  // Like Spotlight, the palette's own window goes away when focus leaves it.
+  if (surface === 'window') window.addEventListener('blur', close);
   $('search-icon').append(icon('search'));
   wire();
   renderScopes();

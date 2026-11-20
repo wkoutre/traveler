@@ -41,13 +41,18 @@ body {
   display: none;
 }
 
-/* The toolbar popup and a plain tab already supply their own frame. */
+/* The toolbar popup, the palette's own window and a plain tab supply their own frame. */
 :root[data-surface='popup'],
 :root[data-surface='popup'] body {
   width: 640px;
   height: 480px;
   background: var(--panel);
 }
+:root[data-surface='window'],
+:root[data-surface='window'] body {
+  background: var(--panel);
+}
+:root[data-surface='window'] .scrim,
 :root[data-surface='popup'] .scrim {
   position: static;
   height: 100%;
@@ -55,6 +60,7 @@ body {
   background: none;
   animation: none;
 }
+:root[data-surface='window'] .panel,
 :root[data-surface='popup'] .panel {
   max-width: none;
   max-height: none;

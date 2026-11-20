@@ -1,7 +1,7 @@
 // Browser tests against the locally installed Chrome, in a throwaway profile.
 //
 //   cd e2e && npm ci && node run.mjs            all suites
-//   node run.mjs overlay ui pages idle shots     chosen suites
+//   node run.mjs overlay ui window pages idle shots     chosen suites
 //
 // Chrome grants activeTab only on a real key press, which automation cannot
 // send to the browser's shortcut handler. The overlay suite therefore loads a
@@ -433,6 +433,76 @@ async function uiSuite(server) {
   await browser.close();
 }
 
+// ---- Pages that cannot be scripted: a centered window ---------------------
+async function windowSuite() {
+  // The shipped manifest, unmodified: injection into chrome:// fails for real.
+  const { browser, id } = await launch(path.join(here, '../extension'));
+  const sw = await worker(browser, id);
+  const page = await browser.newPage();
+  await page.goto('chrome://version/');
+  await page.bringToFront();
+  const paletteTarget = (timeout = 3000) =>
+    browser.waitForTarget((t) => t.url().startsWith(`chrome-extension://${id}/src/palette.html?mode=window`), { timeout }).catch(() => null);
+  const windows = () => sw.evaluate(async () => (await chrome.windows.getAll({ populate: true })).map((w) => ({ id: w.id, type: w.type, left: w.left, top: w.top, width: w.width, height: w.height, focused: w.focused, urls: w.tabs.map((t) => t.url) })));
+
+  await fire(sw);
+  let target = await paletteTarget();
+  check('on a page that cannot be scripted, the palette opens in its own window', Boolean(target));
+  if (!target) return browser.close();
+  const palette = await target.page();
+  await palette.waitForSelector('.row');
+  await palette.screenshot({ path: path.join(outDir, 'window-surface.png') });
+  const all = await windows();
+  const pop = all.find((w) => w.type === 'popup');
+  const main = all.find((w) => w.urls.includes('chrome://version/'));
+  check('it is a popup-type window', Boolean(pop));
+  const offCenter = Math.abs(pop.left + pop.width / 2 - (main.left + main.width / 2));
+  check('it is centered horizontally over the browser window', offCenter <= 2, `${offCenter}px off; popup ${JSON.stringify(pop)} main ${JSON.stringify({ left: main.left, top: main.top, width: main.width, height: main.height })}`);
+  check('it sits in the upper part of the browser window', pop.top >= main.top && pop.top < main.top + main.height / 2);
+  check('it is not the toolbar popup', (await palette.evaluate(() => document.documentElement.dataset.surface)) === 'window');
+  check('the palette window itself is not listed as a tab', !(await titles(palette.mainFrame())).includes('Cmd+K'));
+
+  await type(palette, palette.mainFrame(), 'pin');
+  await palette.keyboard.press('Enter').catch(() => {});
+  await sleep(400);
+  const pinned = await sw.evaluate(async () => (await chrome.tabs.query({ url: 'chrome://version/' }))[0].pinned);
+  check('commands act on the tab the shortcut was pressed in', pinned === true);
+  check('running a command closes the window', (await windows()).every((w) => w.type !== 'popup'));
+
+  await fire(sw);
+  target = await paletteTarget();
+  const second = await target.page();
+  await second.waitForSelector('.row');
+  await type(second, second.mainFrame(), 'new tab');
+  const before = (await windows()).find((w) => w.urls.includes('chrome://version/')).urls.length;
+  await second.keyboard.press('Enter').catch(() => {});
+  await sleep(500);
+  const after = (await windows()).find((w) => w.urls.includes('chrome://version/'));
+  check('a new tab opens in the browser window, not the palette window', after.urls.length === before + 1, `${before} -> ${after.urls.length}`);
+
+  await page.bringToFront();
+  await fire(sw);
+  target = await paletteTarget();
+  await (await target.page()).waitForSelector('.row');
+  await fire(sw);
+  await sleep(400);
+  check('the shortcut toggles: a second press closes the window', (await windows()).every((w) => w.type !== 'popup'));
+
+  await fire(sw);
+  target = await paletteTarget();
+  const third = await target.page();
+  await third.waitForSelector('.row');
+  await third.keyboard.press('Escape').catch(() => {});
+  await sleep(400);
+  check('Escape closes the window', (await windows()).every((w) => w.type !== 'popup'));
+
+  const stray = await browser.newPage();
+  await stray.goto(`chrome-extension://${id}/src/palette.html?mode=window#guess`);
+  await sleep(400);
+  check('the window surface without a valid token renders nothing', await stray.evaluate(() => document.getElementById('panel').hidden && !document.querySelector('.row')));
+  await browser.close();
+}
+
 // ---- Every catalogued chrome:// page exists in this Chrome ---------------
 async function pagesSuite() {
   const { browser } = await launch(path.join(here, '../extension'));
@@ -483,6 +553,7 @@ const server = await startServer();
 try {
   if (want('overlay')) await overlaySuite(server);
   if (want('ui')) await uiSuite(server);
+  if (want('window')) await windowSuite();
   if (want('pages')) await pagesSuite();
   if (want('idle')) await idleSuite(server);
 } finally {

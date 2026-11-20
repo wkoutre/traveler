@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES, flipPrivacy, setSiteRule, resetSiteRule, heldSiteRule } from '../extension/src/catalog.js';
+import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES, flipPrivacy, setSiteRule, resetSiteRule, heldSiteRule, openTab, setHomeWindow } from '../extension/src/catalog.js';
 import { ICON_NAMES } from '../extension/src/icons.js';
 
 const commands = buildCommands();
@@ -198,5 +198,26 @@ test('resetting a site permission drops that one rule and keeps the others', asy
     images: { 'https://a.test/*': 'block' },
   });
   assert.equal(await heldSiteRule('javascript', 'https://a.test/*'), undefined);
+  delete globalThis.chrome;
+});
+
+test('tabs are opened through openTab and queries never use currentWindow', () => {
+  for (const file of ['catalog.js', 'palette.js', 'options.js']) {
+    const source = readFileSync(new URL(`../extension/src/${file}`, import.meta.url), 'utf8');
+    const direct = source.match(/chrome\.tabs\.create\(/g) || [];
+    assert.equal(direct.length, file === 'catalog.js' ? 1 : file === 'options.js' ? 1 : 0, `${file} calls chrome.tabs.create directly`);
+    if (file !== 'palette.js') assert.equal(source.includes('currentWindow'), false, `${file} uses currentWindow`);
+  }
+});
+
+test('openTab targets the home window once one is set', async () => {
+  const calls = [];
+  globalThis.chrome = { tabs: { create: async (props) => calls.push(props) } };
+  await openTab({ url: 'https://a.test/' });
+  setHomeWindow(7);
+  await openTab({ url: 'https://b.test/' });
+  await openTab();
+  setHomeWindow(undefined);
+  assert.deepEqual(calls, [{ url: 'https://a.test/' }, { windowId: 7, url: 'https://b.test/' }, { windowId: 7 }]);
   delete globalThis.chrome;
 });

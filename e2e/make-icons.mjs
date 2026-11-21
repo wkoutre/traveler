@@ -1,15 +1,12 @@
-// Renders extension/icons/*.png from the SVG below with the locally installed Chrome.
+// Renders extension/icons/*.png from extension/icons/logo.svg with the locally installed Chrome.
 // Run: cd e2e && node make-icons.mjs
 import puppeteer from 'puppeteer-core';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const out = fileURLToPath(new URL('../extension/icons/', import.meta.url));
-const svg = (size) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="30" fill="#171717"/>
-  <g fill="none" stroke="#ffffff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M40 34v60M40 68l44-34M58 56l28 38"/>
-  </g>
-</svg>`;
+const logo = readFileSync(`${out}logo.svg`, 'utf8');
+const svg = (size) => logo.replace('width="512" height="512"', `width="${size}" height="${size}"`);
 
 const browser = await puppeteer.launch({
   executablePath: process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',

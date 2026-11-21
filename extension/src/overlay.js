@@ -3,9 +3,9 @@
 export function toggleOverlay(url) {
   // State lives on the isolated world's global, which the page cannot reach.
   // The element id is only a label; a page that plants the same id changes nothing.
-  const ID = '__cmdk_host__';
+  const ID = '__traveler_host__';
   try {
-    const open = globalThis.__cmdkOpen;
+    const open = globalThis.__travelerOpen;
     if (open) {
       const stillShown = open.host.isConnected;
       open.close();
@@ -27,22 +27,22 @@ export function toggleOverlay(url) {
       'position:fixed;inset:0;width:100%;height:100%;border:0;margin:0;padding:0;background:transparent;color-scheme:light;display:block;';
     root.appendChild(frame);
     const onMessage = (event) => {
-      if (event.source === frame.contentWindow && event.data === 'cmdk:close') close();
+      if (event.source === frame.contentWindow && event.data === 'traveler:close') close();
     };
     function close() {
       window.removeEventListener('message', onMessage);
-      globalThis.__cmdkOpen = null;
+      globalThis.__travelerOpen = null;
       host.remove();
       if (previous && typeof previous.focus === 'function') previous.focus({ preventScroll: true });
     }
-    globalThis.__cmdkOpen = { host, close };
+    globalThis.__travelerOpen = { host, close };
     window.addEventListener('message', onMessage);
     document.documentElement.appendChild(host);
     frame.addEventListener('load', () => frame.focus());
     frame.focus();
     return 'opened';
   } catch {
-    globalThis.__cmdkOpen?.close();
+    globalThis.__travelerOpen?.close();
     return 'failed';
   }
 }

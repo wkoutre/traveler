@@ -1,15 +1,14 @@
 /*
  * One block of tokens per theme. Values are copied from each design system's
  * own token files; a line marked "addition" fills a gap the system leaves
- * open (none of the three specifies a command palette).
+ * open (neither specifies a command palette).
  *
- * Family           https://claude.ai/artifact/6WsWoKNKeQDDrAM2hzkkPC  (light only)
- * Uniswap          https://claude.ai/artifact/ABqtJFPcEUytkk9bFE1Brc
- * Cream and Coral  https://claude.ai/artifact/VV3837HWqXTCNK7L8pTyX5
+ * Daylight         white and warm off-white, one blue accent (light only)
+ * Cream and Coral  warm, editorial, light and dark
  */
 
-/* ---- Family: white panel, warm off-white rows, ink text, pills ---------- */
-:root[data-theme='family'] {
+/* ---- Daylight: white panel, warm off-white rows, ink text, pills ---------- */
+:root[data-theme='daylight'] {
   --panel: #ffffff; /* canvas */
   --row-hover: #fbfaf9; /* surface-beige */
   --row-active: #f6f4ef; /* surface-sand */
@@ -20,7 +19,7 @@
   --accent: #0086fc; /* accent-blue, the one bright accent */
   --danger: #ff2b3a; /* accent-red */
   --mark: #121212; /* ink */
-  --scrim: rgba(18, 18, 18, 0.12); /* addition: Family defines no scrim */
+  --scrim: rgba(18, 18, 18, 0.12); /* addition: the system defines no scrim */
   --shadow: 0 3px 16px 0 rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04); /* shadow-dropdown + ring-hairline */
   --focus: #848281;
   --radius-panel: 17px; /* radius-float */
@@ -57,75 +56,6 @@
   --ease: cubic-bezier(0.19, 1, 0.22, 1); /* ease-out-expo */
   --enter-y: 4px;
   --enter-scale: 1;
-}
-
-/* ---- Uniswap: monochrome surfaces, one loud accent, no bounce ----------- */
-:root[data-theme='uniswap'] {
-  --panel: #ffffff; /* surface1 */
-  --row-hover: #f9f9f9; /* surface2 */
-  --row-active: rgba(255, 55, 199, 0.08); /* accent2: selected or highlighted rows */
-  --text: #131313; /* neutral1 */
-  --text-2: rgba(19, 19, 19, 0.63); /* neutral2 */
-  --text-3: rgba(19, 19, 19, 0.35); /* neutral3: placeholder only */
-  --border: rgba(19, 19, 19, 0.08); /* surface3 */
-  --accent: #ff37c7; /* accent1 */
-  --danger: #e10f0f; /* critical */
-  --mark: #e500a5; /* accent1-hovered, darker for text on white */
-  --scrim: rgba(0, 0, 0, 0.5); /* Mycelium overlay */
-  --shadow: 0 10px 20px -5px rgba(19, 19, 19, 0.05), 0 4px 12px -3px rgba(19, 19, 19, 0.04); /* shadow-large */
-  --focus: rgba(19, 19, 19, 0.55); /* neutral3-hovered */
-  --radius-panel: 20px;
-  --radius-row: 12px;
-  --radius-pill: 9999px;
-  --radius-kbd: 6px;
-  --font: 'Basel Grotesk', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'InputMono-Regular', ui-monospace, 'SF Mono', Menlo, monospace;
-  --input-size: 16px; /* body-2 */
-  --input-tracking: 0;
-  --row-size: 14px; /* dropdown item: 14/20 medium */
-  --row-line: 20px;
-  --row-weight: 535;
-  --row-tracking: 0;
-  --sub-size: 12px; /* body-4 */
-  --sub-tracking: 0;
-  --section-size: 12px;
-  --section-weight: 485;
-  --section-tracking: 0;
-  --section-case: none;
-  --pill-height: 28px;
-  --pill-pad: 12px;
-  --pill-size: 14px; /* button-3 */
-  --pill-weight: 535;
-  --pill-bg: transparent;
-  --pill-text: rgba(19, 19, 19, 0.63);
-  --pill-bg-on: #f2f2f2; /* surface3-solid */
-  --pill-text-on: #131313;
-  --kbd-bg: transparent;
-  --kbd-border: rgba(19, 19, 19, 0.08);
-  --kbd-text: rgba(19, 19, 19, 0.63);
-  --dur-in: 200ms; /* dialog appear */
-  --dur-out: 100ms;
-  --ease: ease-out; /* addition: no easing tokens defined */
-  --enter-y: 4px; /* 4px rise */
-  --enter-scale: 1;
-}
-:root[data-theme='uniswap'][data-mode='dark'] {
-  --panel: #131313;
-  --row-hover: #1f1f1f;
-  --row-active: rgba(255, 55, 199, 0.08);
-  --text: #ffffff;
-  --text-2: rgba(255, 255, 255, 0.65);
-  --text-3: rgba(255, 255, 255, 0.38);
-  --border: rgba(255, 255, 255, 0.12);
-  --danger: #ff593c;
-  --mark: #ff37c7;
-  --shadow: 0 16px 24px -6px rgba(0, 0, 0, 0.6), 0 8px 12px -4px rgba(0, 0, 0, 0.48);
-  --focus: rgba(255, 255, 255, 0.58);
-  --pill-text: rgba(255, 255, 255, 0.65);
-  --pill-bg-on: #393939;
-  --pill-text-on: #ffffff;
-  --kbd-border: rgba(255, 255, 255, 0.12);
-  --kbd-text: rgba(255, 255, 255, 0.65);
 }
 
 /* ---- Cream and Coral: warm, editorial, coral used sparingly ------------- */

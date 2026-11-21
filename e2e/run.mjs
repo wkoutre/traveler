@@ -30,7 +30,7 @@ function check(name, ok, detail = '') {
 }
 
 function testCopy() {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'cmdk-e2e-'));
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'traveler-e2e-'));
   cpSync(path.join(here, '../extension'), dir, { recursive: true });
   const file = path.join(dir, 'manifest.json');
   const manifest = JSON.parse(readFileSync(file, 'utf8'));
@@ -92,7 +92,7 @@ async function paletteFrame(page, id, timeout = 3000) {
   return null;
 }
 
-const hostExists = (page) => page.evaluate(() => Boolean(document.getElementById('__cmdk_host__')));
+const hostExists = (page) => page.evaluate(() => Boolean(document.getElementById('__traveler_host__')));
 const titles = (frame) => frame.$$eval('.row .title', (els) => els.map((e) => e.textContent));
 const activeTitle = (frame) => frame.$eval('.row[aria-selected="true"] .title', (e) => e.textContent).catch(() => null);
 
@@ -141,7 +141,7 @@ async function overlaySuite(server) {
   await frame.waitForSelector('.row');
   const openMs = Date.now() - t0;
   check('first results render within 500 ms of the shortcut', openMs < 500, `${openMs} ms`);
-  check('the page cannot read the overlay frame', await page.evaluate(() => document.getElementById('__cmdk_host__').shadowRoot === null && document.querySelectorAll('iframe').length === 0));
+  check('the page cannot read the overlay frame', await page.evaluate(() => document.getElementById('__traveler_host__').shadowRoot === null && document.querySelectorAll('iframe').length === 0));
   check('typing focus lands in the search field', (await frame.evaluate(() => document.activeElement?.id)) === 'input');
 
   await type(page, frame, 'pin');
@@ -215,7 +215,7 @@ async function overlaySuite(server) {
   // A page plants an element with the overlay's id.
   await page.evaluate(() => {
     const fake = document.createElement('div');
-    fake.id = '__cmdk_host__';
+    fake.id = '__traveler_host__';
     document.body.append(fake);
   });
   await fire(sw);
@@ -230,7 +230,7 @@ async function overlaySuite(server) {
   await fire(sw);
   await paletteFrame(page, id);
   await sleep(200);
-  await page.evaluate(() => document.querySelectorAll('#__cmdk_host__').forEach((el) => el.remove()));
+  await page.evaluate(() => document.querySelectorAll('#__traveler_host__').forEach((el) => el.remove()));
   await sleep(100);
   await fire(sw);
   frame = await paletteFrame(page, id, 1000);
@@ -272,16 +272,14 @@ async function overlaySuite(server) {
 async function shots(browser, id, sw, base) {
   const page = await browser.newPage();
   for (const [theme, appearance, bg] of [
-    ['Family', 'Light', 'plain'],
-    ['Uniswap', 'Light', 'plain'],
-    ['Uniswap', 'Dark', 'dark'],
+    ['Daylight', 'Light', 'plain'],
     ['Cream and Coral', 'Light', 'plain'],
     ['Cream and Coral', 'Dark', 'dark'],
   ]) {
     await page.goto(`${base}/${bg}`);
     await page.bringToFront();
     await sw.evaluate((prefs) => chrome.storage.local.set({ prefs }), {
-      theme: { Family: 'family', Uniswap: 'uniswap', 'Cream and Coral': 'cream' }[theme],
+      theme: { Daylight: 'daylight', 'Cream and Coral': 'cream' }[theme],
       appearance: appearance.toLowerCase(),
     });
     // Open once so the pre-paint mirror picks the new prefs up, then again for the shot.
@@ -422,7 +420,7 @@ async function uiSuite(server) {
   const after = await sw.evaluate(async () => (await chrome.privacy.websites.doNotTrackEnabled.get({})).value);
   check('confirming flips the switch', after === !before, `${before} -> ${after}`);
   await type(page, frame, 'do not track');
-  check('the list shows the new state, marked as set by the palette', (await frame.$eval('.row .subtitle', (e) => e.textContent)) === `${after ? 'On' : 'Off'} · set by Cmd+K`);
+  check('the list shows the new state, marked as set by the palette', (await frame.$eval('.row .subtitle', (e) => e.textContent)) === `${after ? 'On' : 'Off'} · set by Traveler`);
   await page.keyboard.press('Enter');
   await sleep(150);
   await page.keyboard.press('Enter');
@@ -433,19 +431,19 @@ async function uiSuite(server) {
   await sleep(100);
 
   // Themes.
-  await type(page, frame, 'theme uniswap');
+  await type(page, frame, 'theme cream');
   await page.keyboard.press('Enter');
   await sleep(200);
-  check('a theme command restyles the open palette', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'uniswap');
-  check('the choice is stored', (await sw.evaluate(async () => (await chrome.storage.local.get('prefs')).prefs.theme)) === 'uniswap');
+  check('a theme command restyles the open palette', (await page.evaluate(() => document.documentElement.dataset.theme)) === 'cream');
+  check('the choice is stored', (await sw.evaluate(async () => (await chrome.storage.local.get('prefs')).prefs.theme)) === 'cream');
   await type(page, frame, 'appearance dark');
   await page.keyboard.press('Enter');
   await sleep(200);
-  check('dark appearance applies', (await page.evaluate(() => getComputedStyle(document.querySelector('.panel')).backgroundColor)) === 'rgb(19, 19, 19)');
-  await type(page, frame, 'theme family');
+  check('dark appearance applies', (await page.evaluate(() => getComputedStyle(document.querySelector('.panel')).backgroundColor)) === 'rgb(37, 35, 32)');
+  await type(page, frame, 'theme daylight');
   await page.keyboard.press('Enter');
   await sleep(200);
-  check('Family stays light when dark is selected', (await page.evaluate(() => getComputedStyle(document.querySelector('.panel')).backgroundColor)) === 'rgb(255, 255, 255)');
+  check('Daylight stays light when dark is selected', (await page.evaluate(() => getComputedStyle(document.querySelector('.panel')).backgroundColor)) === 'rgb(255, 255, 255)');
 
   // Position.
   await type(page, frame, '');
@@ -624,7 +622,7 @@ async function windowSuite() {
   check('it is centered horizontally over the browser window', offCenter <= 2, `${offCenter}px off; popup ${JSON.stringify(pop)} main ${JSON.stringify({ left: main.left, top: main.top, width: main.width, height: main.height })}`);
   check('it sits in the upper part of the browser window', pop.top >= main.top && pop.top < main.top + main.height / 2);
   check('it is not the toolbar popup', (await palette.evaluate(() => document.documentElement.dataset.surface)) === 'window');
-  check('the palette window itself is not listed as a tab', !(await titles(palette.mainFrame())).includes('Cmd+K'));
+  check('the palette window itself is not listed as a tab', !(await titles(palette.mainFrame())).includes('Traveler'));
 
   await type(palette, palette.mainFrame(), 'pin');
   await palette.keyboard.press('Enter').catch(() => {});
@@ -751,7 +749,7 @@ async function idleSuite(server) {
   });
   const page = await browser.newPage();
   await page.goto(`${base}/plain`);
-  const injected = await page.evaluate(() => document.documentElement.outerHTML.includes('cmdk') || Object.keys(window).some((k) => /cmdk/i.test(k)));
+  const injected = await page.evaluate(() => document.documentElement.outerHTML.includes('traveler') || Object.keys(window).some((k) => /traveler/i.test(k)));
   check('nothing is injected into a page until the shortcut fires', injected === false);
   console.log('     waiting 40 s for the service worker to go idle');
   await sleep(40000);

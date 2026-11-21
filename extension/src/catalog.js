@@ -519,7 +519,7 @@ function privacyCommand() {
         const locked = !ours && levelOfControl !== 'controllable_by_this_extension';
         rows.push(
           action(`privacy.${key}`, title, 'shield', value ? 'on' : 'off', {
-            subtitle: `${value ? 'On' : 'Off'}${locked ? ' · managed elsewhere' : ours ? ' · set by Cmd+K' : ''}`,
+            subtitle: `${value ? 'On' : 'Off'}${locked ? ' · managed elsewhere' : ours ? ' · set by Traveler' : ''}`,
             children: () =>
               locked
                 ? [action('privacy.locked', 'This switch is controlled by policy or another extension', 'close', '', { run: () => ({ pop: true }) })]
@@ -600,7 +600,7 @@ function siteSettingsCommand() {
         const held = await heldSiteRule(key, pattern);
         rows.push(
           action(`site.${key}`, title, 'shield', current, {
-            subtitle: `${VALUE_LABEL[current] || current} on ${origin.hostname}${held ? ' · set by Cmd+K' : ''}`,
+            subtitle: `${VALUE_LABEL[current] || current} on ${origin.hostname}${held ? ' · set by Traveler' : ''}`,
             children: () => [
               ...values
                 .filter((v) => v !== current)
@@ -636,10 +636,15 @@ function siteSettingsCommand() {
 // ---- The palette itself -------------------------------------------------
 
 export const THEMES = [
-  ['family', 'Family'],
-  ['uniswap', 'Uniswap'],
+  ['daylight', 'Daylight'],
   ['cream', 'Cream and Coral'],
 ];
+
+export const DEFAULT_THEME = THEMES[0][0];
+
+// A saved theme that no longer exists (an older build's 'family' or 'uniswap')
+// falls back to the default instead of leaving the palette unstyled.
+export const themeId = (saved) => (THEMES.some(([id]) => id === saved) ? saved : DEFAULT_THEME);
 
 export const APPEARANCES = [
   ['system', 'Match system'],
@@ -668,7 +673,7 @@ function paletteCommands() {
       children: (c) =>
         confirm('Clear learned ranking', 'Results go back to plain text order', () => c.clearLearned()),
     }),
-    action('palette.options', 'Cmd+K options', 'gear', 'settings preferences palette', {
+    action('palette.options', 'Traveler options', 'gear', 'settings preferences palette cmdk', {
       run: () => chrome.runtime.openOptionsPage(),
     }),
     action('palette.shortcut', 'Change the palette shortcut', 'gear', 'keyboard hotkey rebind cmd+k key', {

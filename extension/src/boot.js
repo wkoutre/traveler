@@ -6,7 +6,7 @@
   try {
     prefs = JSON.parse(localStorage.getItem('prefs') || '{}');
   } catch (e) {}
-  var theme = ['family', 'uniswap', 'cream'].indexOf(prefs.theme) >= 0 ? prefs.theme : 'family';
+  var theme = ['daylight', 'cream'].indexOf(prefs.theme) >= 0 ? prefs.theme : 'daylight';
   var appearance = prefs.appearance === 'light' || prefs.appearance === 'dark' ? prefs.appearance : 'system';
   var dark = appearance === 'dark' || (appearance === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   root.dataset.theme = theme;

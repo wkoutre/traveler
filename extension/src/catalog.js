@@ -144,9 +144,10 @@ export async function searchWeb(text) {
   const tab = await openTab({ active: false });
   try {
     await chrome.search.query({ text, tabId: tab.id });
-  } catch {
+  } catch (error) {
     await chrome.tabs.remove(tab.id).catch(() => {});
-    throw new Error('Could not run the search');
+    // The browser's reason is worth showing, e.g. "Missing default search provider."
+    throw new Error(error?.message ? `Could not run the search: ${error.message}` : 'Could not run the search');
   }
   await chrome.tabs.update(tab.id, { active: true });
 }

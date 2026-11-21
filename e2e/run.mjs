@@ -583,8 +583,10 @@ async function uiSuite(server) {
     return hit ? { url: plain(hit), active: hit.active } : { urls: tabs.map(plain) };
   });
   check('the web search row opens a search for the typed text in a new tab', Boolean(found.url), JSON.stringify(found));
-  // Chrome marks searches it builds for its default engine; the extension holds no engine address.
-  check('and the browser, not the extension, built the search address', /sourceid=chrome/.test(found.url || ''), JSON.stringify(found));
+  // The throwaway profile's default engine is Google, and Chrome adds this tag to the
+  // Google searches it builds. It says nothing about other engines. This check and
+  // the one above need the network: the tab really loads the engine.
+  check('and, with Google as the default engine, the address carries the tag Chrome adds', /sourceid=chrome/.test(found.url || ''), JSON.stringify(found));
   check('and shows that tab', found.active === true, JSON.stringify(found));
   check('and closes the palette', searcher.isClosed());
 

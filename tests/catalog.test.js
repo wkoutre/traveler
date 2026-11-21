@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES, flipPrivacy, setSiteRule, resetSiteRule, heldSiteRule, openTab, setHomeWindow, searchWeb } from '../extension/src/catalog.js';
 import { ICON_NAMES } from '../extension/src/icons.js';
 
@@ -257,14 +257,15 @@ test('web search runs in a new tab through the default search engine', async () 
 
 test('a web search that fails closes its empty tab and says so', async () => {
   const calls = searchFake({ fail: true });
-  await assert.rejects(searchWeb('quokka facts'), /Could not run the search/);
+  await assert.rejects(searchWeb('quokka facts'), { message: 'Could not run the search: no provider' });
   delete globalThis.chrome;
   assert.deepEqual(calls.map((c) => c[0]), ['create', 'query', 'remove']);
 });
 
-test('no search engine address is built into the extension', () => {
-  for (const file of ['catalog.js', 'palette.js', 'background.js']) {
-    const source = readFileSync(new URL(`../extension/src/${file}`, import.meta.url), 'utf8');
-    assert.ok(!/google\.com\/search|[?&]q=/.test(source), file);
-  }
+test('no search address is built into the extension', () => {
+  const dir = new URL('../extension/src/', import.meta.url);
+  const files = readdirSync(dir).filter((f) => f.endsWith('.js'));
+  assert.ok(files.includes('palette.js') && files.includes('overlay.js'));
+  // Any engine's results address: a /search path, or a q= or query= parameter.
+  for (const file of files) assert.ok(!/\/search\?|[?&](q|query|p|text)=/.test(readFileSync(new URL(file, dir), 'utf8')), file);
 });

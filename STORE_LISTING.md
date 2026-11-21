@@ -1,6 +1,6 @@
 # Chrome Web Store submission
 
-Everything that goes into the Chrome Web Store dashboard for Traveler. Package: `dist/traveler-<version>.zip`, built by `./release.sh` (CI builds and submits it on every release; see README "Release").
+Everything that goes into the Chrome Web Store dashboard for Traveler. For the step-by-step first upload, with the local path of every file, see [README: First Chrome Web Store upload](README.md#first-chrome-web-store-upload). Package: `dist/traveler-<version>.zip`, built by `./release.sh` (CI builds and submits it on every release; see README "Release").
 
 Store search weighs the name most, then the summary, then the description. Name and summary come from `extension/manifest.json` (`name`, `description`); the rest is edited in the dashboard. Keep other products' names out of all three (the store's keyword-spam policy).
 

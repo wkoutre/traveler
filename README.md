@@ -93,6 +93,35 @@ The browser tests start Chrome with a throwaway profile. Suites: `overlay`, `ui`
 
 Chrome grants `activeTab` only on a real key press, which automation cannot send to the shortcut handler. The overlay suite therefore loads a temporary copy of the extension with host access added and fires the command event directly; pressing the real shortcut is a manual check.
 
+## First Chrome Web Store upload
+
+The Web Store dashboard only works by hand (Chrome blocks extensions and automation from its pages), so the first listing is created manually. After that, CI uploads every release (see Release below). Every field to paste is in [STORE_LISTING.md](STORE_LISTING.md).
+
+The paths below assume this repo is cloned at `/Volumes/Storage/Projects/traveler`. Elsewhere, use the repo-relative path.
+
+| Upload | Where in the dashboard | Local path |
+|---|---|---|
+| Package | New item | `/Volumes/Storage/Projects/traveler/dist/traveler-0.1.1.zip` (`dist/traveler-<version>.zip`; run `./release.sh` to build it) |
+| Store icon, 128×128 | Store listing → Graphic assets → Store icon | `/Volumes/Storage/Projects/traveler/extension/icons/128.png` |
+| Screenshot 1 | Store listing → Screenshots | `/Volumes/Storage/Projects/traveler/store-assets/screenshot-1-palette-1280x800.png` |
+| Screenshot 2 | Store listing → Screenshots | `/Volumes/Storage/Projects/traveler/store-assets/screenshot-2-tabs-1280x800.png` |
+| Screenshot 3 | Store listing → Screenshots | `/Volumes/Storage/Projects/traveler/store-assets/screenshot-3-settings-1280x800.png` |
+| Screenshot 4 | Store listing → Screenshots | `/Volumes/Storage/Projects/traveler/store-assets/screenshot-4-safety-1280x800.png` |
+| Screenshot 5 | Store listing → Screenshots | `/Volumes/Storage/Projects/traveler/store-assets/screenshot-5-themes-1280x800.png` |
+| Small promo tile, 440×280 | Store listing → Small promo tile | `/Volumes/Storage/Projects/traveler/store-assets/promo-tile-440x280.png` |
+
+Steps:
+
+1. Open <https://chrome.google.com/webstore/devconsole>, signed in as the Keyline publisher account. Click **New item** and choose the zip above.
+2. **Store listing:** paste the description from [STORE_LISTING.md](STORE_LISTING.md#store-listing-tab). Set the category to Productivity: Tools and the language to English. Upload the icon, the five screenshots in order and the promo tile. Homepage URL: `https://github.com/wkoutre/traveler`. Support URL: `https://github.com/wkoutre/traveler/issues`.
+3. **Privacy:** paste the single purpose and the 16 permission justifications from [STORE_LISTING.md](STORE_LISTING.md#privacy-tab). Remote code: **No**. Tick the three data-use certifications. Privacy policy URL: `https://github.com/wkoutre/traveler/blob/main/PRIVACY.md`.
+4. **Distribution:** Public, all regions, free.
+5. Click **Submit for review**.
+6. Copy the item id, the 32-letter id in the dashboard URL. Automatic publishing then needs three things:
+   - Repo variables (Settings → Secrets and variables → Actions → Variables): `CWS_EXTENSION_ID` (that id), `CWS_PUBLISHER_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER` and `GCP_SERVICE_ACCOUNT`. The publisher id and service account are the same values Keyline uses. The provider is printed by the script in the next step.
+   - A `chrome-web-store` environment (Settings → Environments).
+   - Run `scripts/gcp-keyless-setup.sh` once in Cloud Shell for project `keyline-cws`.
+
 ## Release
 
 Merging to `main` a change to `extension/manifest.json`, `extension/src/**` or the icon PNGs bumps the patch version, builds `dist/traveler-<version>.zip` with `./release.sh`, and submits it to the Chrome Web Store (`.github/workflows/publish.yml`). The publish job signs in to Google keylessly through Workload Identity Federation (`scripts/gcp-keyless-setup.sh`); no credential is stored. Never bump the version by hand. Store copy and assets live in [STORE_LISTING.md](STORE_LISTING.md) and `store-assets/`; `cd e2e && node store-shots.mjs` regenerates the screenshots and promo tile from a throwaway profile with demo tabs.

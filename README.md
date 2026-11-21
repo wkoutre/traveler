@@ -1,10 +1,20 @@
-# Cmd+K for Chrome
+<p align="center"><img src="extension/icons/logo.svg" width="96" alt=""></p>
 
-A command palette for Google Chrome. Press Cmd+K on any page to search open tabs, bookmarks, history and recently closed tabs, open any Chrome settings page, and run browser actions without leaving the keyboard.
+# Traveler
 
-It is a Manifest V3 extension written in plain JavaScript, with no dependencies and no build step.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+**Get anywhere in Chrome from the keyboard.** Press Cmd+K (Ctrl+K on Windows and Linux) on any page to search open tabs, bookmarks, history and recently closed tabs, open any Chrome settings page, and run browser actions without touching the mouse.
+
+- **Free and open source.** MIT licensed. The code that runs is the code in this repo: plain JavaScript, Manifest V3, no dependencies, no build step.
+- **Private by design.** No servers, no analytics, no network requests of its own. See [PRIVACY.md](PRIVACY.md).
+- **Costs nothing while idle.** No content scripts, no host permissions; it wakes only when you press the shortcut.
+
+Traveler is part of an open-source suite of keyboard-first Chrome extensions, alongside [Keyline](https://github.com/wkoutre/keyline) (keyboard shortcuts, a command palette and split inbox for Gmail).
 
 ## Install
+
+From the Chrome Web Store (coming soon), or from source:
 
 1. Open `chrome://extensions` and turn on Developer mode.
 2. Choose "Load unpacked" and select the `extension/` folder.
@@ -61,16 +71,18 @@ No content script is registered and the extension has no host permissions. The s
 
 - Commands that delete data, close many tabs, or change a privacy, site or extension setting never run from the first Enter. Each ends in a page with an explicit choice and a Cancel row.
 - The palette page is web-accessible so the overlay can frame it, which means any page can also frame it or open it in a tab. It stays blank unless it is the overlay with a one-time token the service worker stored for that key press, the palette's own window with the same kind of token, or the toolbar popup. The overlay frame sits in a closed shadow root so the page cannot read its URL. A page can still detect that the extension is installed.
-- A privacy switch or site permission changed from the palette is marked "set by Cmd+K". Flipping a switch back, or choosing Reset on a site permission, hands the setting back to Chrome instead of leaving the extension in control of it.
+- A privacy switch or site permission changed from the palette is marked "set by Traveler". Flipping a switch back, or choosing Reset on a site permission, hands the setting back to Chrome instead of leaving the extension in control of it.
 - The extension makes no network requests of its own. A web search is run by the browser, with the engine set in its settings. Site icons come from Chrome's local favicon cache.
 
 ## Themes
 
-Family (default, light only), Uniswap and Cream and Coral, each with tokens copied from the design system's own files. Switch from the palette ("Theme: …", "Appearance: …") or the options page. To add a theme, add one token block to `extension/src/themes.css`, one entry to `THEMES` in `catalog.js`, and its id to the list in `boot.js`; `npm test` fails if a token is missing.
+Daylight (default, light only) and Cream and Coral (light and dark). Switch from the palette ("Theme: …", "Appearance: …") or the options page. To add a theme, add one token block to `extension/src/themes.css`, one entry to `THEMES` in `catalog.js`, and its id to the list in `boot.js`; `npm test` fails if a token is missing.
 
 The themes name their fonts (Inter, Basel Grotesk) but ship no font files, so each falls back to the system font where the named one is not installed.
 
 ## Develop
+
+Pull requests and issues are welcome at <https://github.com/wkoutre/traveler/issues>.
 
 ```sh
 npm test                      # unit tests, Node only
@@ -80,3 +92,11 @@ cd e2e && npm ci && node run.mjs   # browser tests against the installed Chrome
 The browser tests start Chrome with a throwaway profile. Suites: `overlay`, `ui`, `window` (the fallback window on a `chrome://` page), `pages` (loads every catalogued `chrome://` URL), `idle` (waits 40 seconds, then checks the service worker has stopped) and `shots` (theme screenshots in `e2e/out/`). Pass suite names to run a subset.
 
 Chrome grants `activeTab` only on a real key press, which automation cannot send to the shortcut handler. The overlay suite therefore loads a temporary copy of the extension with host access added and fires the command event directly; pressing the real shortcut is a manual check.
+
+## Release
+
+Merging to `main` a change to `extension/manifest.json`, `extension/src/**` or the icon PNGs bumps the patch version, builds `dist/traveler-<version>.zip` with `./release.sh`, and submits it to the Chrome Web Store (`.github/workflows/publish.yml`). The publish job signs in to Google keylessly through Workload Identity Federation (`scripts/gcp-keyless-setup.sh`); no credential is stored. Never bump the version by hand. Store copy and assets live in [STORE_LISTING.md](STORE_LISTING.md) and `store-assets/`; `cd e2e && node store-shots.mjs` regenerates the screenshots and promo tile from a throwaway profile with demo tabs.
+
+## License
+
+[MIT](LICENSE)

@@ -1,6 +1,6 @@
-# cmdk-chrome
+# Traveler
 
-A Cmd+K command palette for Chrome: MV3, plain JavaScript, no dependencies, no build step. `README.md` describes behavior; this file is what to know before changing it.
+Traveler (repo formerly `cmdk-chrome`) is a Cmd+K command palette for Chrome: MV3, plain JavaScript, no dependencies, no build step. `README.md` describes behavior; this file is what to know before changing it.
 
 ## Layout
 
@@ -18,7 +18,8 @@ A Cmd+K command palette for Chrome: MV3, plain JavaScript, no dependencies, no b
 - A command that deletes data, closes many tabs, or changes a setting has `children()` ending in `confirm()` or an explicit choice, never a top-level `run()`. Add its id to `GUARDED`.
 - A new permission needs a line in the `evidence` map in `tests/catalog.test.js`; an unused one fails the test.
 - Verify a new `chrome://` URL with `node run.mjs pages` in `e2e/`. Chrome renames and removes these between versions.
-- Theme values come from the design system's token files. Mark anything the system does not define with an `addition` comment.
+- Theme values come from the design system's token files. Mark anything the system does not define with an `addition` comment. Theme names, the store listing and the docs never name another company or product (store keyword-spam policy); `tests/themes.test.js` pins the theme part.
+- Never bump the version by hand: merging to main bumps, packages (`./release.sh`) and submits to the Chrome Web Store (`.github/workflows/publish.yml`).
 - In `catalog.js` and `palette.js`, open tabs with `openTab()`, never `chrome.tabs.create` directly. In `catalog.js`, scope tab queries with `windowId: c.tab.windowId`, never `currentWindow`. In the palette's own window the "current" window is the palette; `activeTab()` in `palette.js` is the one place that resolves which tab the user meant.
 - No network requests, no remote code, no `innerHTML` with page or user data.
 

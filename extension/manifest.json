@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Cmd+K",
+  "name": "Traveler: Command Palette for Chrome Tabs, Bookmarks & Settings",
+  "short_name": "Traveler",
   "version": "0.1.0",
-  "description": "A command palette for Chrome: tabs, bookmarks, history, settings and browser actions from one shortcut.",
+  "description": "Press Cmd+K to search tabs, bookmarks, history and every Chrome setting, and run browser actions. Free, open source, no tracking.",
   "minimum_chrome_version": "127",
   "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
   "permissions": [
@@ -24,7 +25,7 @@
     "search"
   ],
   "background": { "service_worker": "src/background.js", "type": "module" },
-  "action": { "default_popup": "src/palette.html?mode=popup", "default_title": "Cmd+K" },
+  "action": { "default_popup": "src/palette.html?mode=popup", "default_title": "Traveler" },
   "options_ui": { "page": "src/options.html", "open_in_tab": true },
   "commands": {
     "open-palette": {

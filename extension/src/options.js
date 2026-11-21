@@ -1,4 +1,4 @@
-import { THEMES, APPEARANCES } from './catalog.js';
+import { THEMES, APPEARANCES, themeId } from './catalog.js';
 
 function readPrefs() {
   try {
@@ -10,7 +10,7 @@ function readPrefs() {
 
 function apply(prefs) {
   const root = document.documentElement;
-  root.dataset.theme = prefs.theme || 'family';
+  root.dataset.theme = themeId(prefs.theme);
   const appearance = prefs.appearance || 'system';
   const dark = appearance === 'dark' || (appearance === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   root.dataset.mode = dark ? 'dark' : 'light';
@@ -39,7 +39,7 @@ function group(el, options, key, current) {
 }
 
 function render(prefs) {
-  group(document.getElementById('themes'), THEMES, 'theme', prefs.theme || 'family');
+  group(document.getElementById('themes'), THEMES, 'theme', themeId(prefs.theme));
   group(document.getElementById('appearances'), APPEARANCES, 'appearance', prefs.appearance || 'system');
 }
 

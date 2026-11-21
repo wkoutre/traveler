@@ -1,5 +1,5 @@
 {
-  "name": "cmdk-chrome-e2e",
+  "name": "traveler-e2e",
   "private": true,
   "type": "module",
   "dependencies": {

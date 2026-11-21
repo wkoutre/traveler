@@ -1,6 +1,6 @@
 import { rank } from './fuzzy.js';
 import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
-import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow } from './catalog.js';
+import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow, themeId } from './catalog.js';
 import { icon } from './icons.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
@@ -85,7 +85,7 @@ async function authorized() {
 }
 
 function close() {
-  if (surface === 'overlay') window.parent.postMessage('cmdk:close', '*');
+  if (surface === 'overlay') window.parent.postMessage('traveler:close', '*');
   else window.close();
 }
 
@@ -625,7 +625,7 @@ function readPrefs() {
 
 function applyPrefs(prefs) {
   const root = document.documentElement;
-  root.dataset.theme = prefs.theme || 'family';
+  root.dataset.theme = themeId(prefs.theme);
   const appearance = prefs.appearance || 'system';
   const dark = appearance === 'dark' || (appearance === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   root.dataset.mode = dark ? 'dark' : 'light';

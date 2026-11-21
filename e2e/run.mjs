@@ -509,6 +509,22 @@ async function uiSuite(server) {
   check('two picks for the same typing put that result first', (await titles(frame))[0] === second, `${(await titles(frame)).slice(0, 3).join(' | ')}; plain order ${plain.slice(0, 3).join(' | ')}`);
   await type(page, frame, 'close tab');
   check('and it leads while typing toward the same text', (await titles(frame))[0] === second, (await titles(frame)).slice(0, 3).join(' | '));
+  // Another open palette saves a pick, then clears the record, while this one stays open.
+  await sw.evaluate(async () => {
+    const { learned } = await chrome.storage.local.get('learned');
+    learned.q.elsewhere = { 'p.elsewhere': [1, Date.now()] };
+    await chrome.storage.local.set({ learned });
+  });
+  await sleep(150);
+  await pickSecond();
+  const both = await stored(sw, 'learned');
+  check('a pick does not overwrite what another open palette saved', Boolean(both?.q?.elsewhere && both?.q?.['close tabs']), JSON.stringify(both));
+  await sw.evaluate(() => chrome.storage.local.remove('learned'));
+  await sleep(150);
+  await pickSecond();
+  const afterClear = await stored(sw, 'learned');
+  check('a pick does not bring back a record cleared elsewhere', JSON.stringify(Object.keys(afterClear?.q || {})) === '["close tabs"]' && afterClear.q['close tabs'][Object.keys(afterClear.q['close tabs'])[0]][0] === 1, JSON.stringify(afterClear));
+  await pickSecond();
   await page.reload();
   await page.waitForSelector('.row');
   await type(page, frame, 'close tabs');

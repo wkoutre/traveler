@@ -33,10 +33,11 @@ The palette remembers which result you pick for what you typed, and ranks it hig
 - **Two picks to lead.** The first pick for some typed text moves that result up, but the best text match keeps first place. The second pick puts it first.
 - **A changed habit wins after two picks.** Each pick halves the other results learned for the same text.
 - **It carries over while you type.** A pick for "sett" counts in part for "set" and "settin", by the share of characters in common.
+- **Exact typing wins.** A result picked twice for exactly what you typed leads one that only carried over from other typing, so "sett" and "settings" can each keep a different first result.
 - **It fades.** A pick loses half its weight every 30 days, so a result picked twice and then left alone gives up first place after about three weeks.
 - **Overall use counts a little.** A result you pick often, whatever you typed, gets a small bonus that never beats a clearly better text match.
 
-Pages are learned by address, so an open tab, a bookmark and a history entry for the same address share what was learned. The record holds the text you typed and the id or address of what you picked, at most 500 pairs, in the browser profile on this machine. Picks made from a private window are not recorded, nor are web searches or steps inside a command's page of choices. The command "Clear learned ranking" deletes the record.
+Pages are learned by address, so an open tab, a bookmark and a history entry for the same address share what was learned. The record holds the text you typed and the id or address of what you picked, at most 500 pairs, in the browser profile on this machine. Picks made from a private window are not recorded, nor are web searches, steps inside a command's page of choices, or a pick made when the palette cannot tell which tab it was opened from. The command "Clear learned ranking" deletes the record.
 
 ## What it reaches
 

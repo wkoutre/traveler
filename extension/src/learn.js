@@ -10,6 +10,9 @@
 //              text or continues it, by the share of characters in common.
 //   promotion  a result whose weight for the typed text reaches PROMOTE goes
 //              above every result that has not. One pick is below it; two are above.
+//   exactness  among promoted results, one that reached PROMOTE on exactly the
+//              typed text leads one that got there through sharing, so two
+//              picks for a text always win it, and each text keeps its own leader.
 //   boost      below that, weight only adds to the text score, and the best
 //              text match keeps first place, so a single pick cannot take it.
 //   prior      overall use of a result, whatever was typed, adds a small bonus.
@@ -114,9 +117,11 @@ function shared(typed, learned) {
   return 0;
 }
 
-// direct: weight for this typed text, per key. overall: weight for any text.
+// exact: weight for exactly this typed text, per key. direct: the same plus
+// the shared part of related texts. overall: weight for any text.
 export function evidence(store, query, now) {
   const typed = normalize(query);
+  const exact = new Map();
   const direct = new Map();
   const overall = new Map();
   for (const [text, entries] of Object.entries(store.q)) {
@@ -125,35 +130,38 @@ export function evidence(store, query, now) {
       const weight = decayed(entry, now);
       overall.set(key, (overall.get(key) || 0) + weight);
       if (share) direct.set(key, (direct.get(key) || 0) + share * weight);
+      if (share === 1) exact.set(key, weight);
     }
   }
-  return { direct, overall };
+  return { exact, direct, overall };
 }
 
 // Reorders rows that `rank` scored. Returns new rows; the input is untouched.
 export function arrange(rows, store, query, now) {
   if (!rows.length || !Object.keys(store.q).length) return rows.slice();
-  const { direct, overall } = evidence(store, query, now);
+  const { exact, direct, overall } = evidence(store, query, now);
   let anchor = 0;
   const scored = rows.map((row, index) => {
     if (row.score > rows[anchor].score) anchor = index;
     const key = keyOf(row.item);
     const weight = (key && direct.get(key)) || 0;
+    const own = (key && exact.get(key)) || 0;
     const use = (key && overall.get(key)) || 0;
     return {
       row,
       index,
-      weight,
-      promoted: weight >= PROMOTE,
+      // 2: learned for exactly this text. 1: learned through related text. 0: not promoted.
+      tier: own >= PROMOTE ? 2 : weight >= PROMOTE ? 1 : 0,
+      lead: own >= PROMOTE ? own : weight,
       boosted: row.score + (BOOST * Math.min(weight, PROMOTE)) / PROMOTE + (PRIOR * Math.min(use, CAP)) / CAP,
     };
   });
   // The best text match stays ahead of everything that is not promoted.
   const lead = scored[anchor];
   scored.sort((a, b) => {
-    if (a.promoted !== b.promoted) return a.promoted ? -1 : 1;
-    if (a.promoted && a.weight !== b.weight) return b.weight - a.weight;
-    if (!a.promoted && (a === lead || b === lead)) return a === lead ? -1 : 1;
+    if (a.tier !== b.tier) return b.tier - a.tier;
+    if (a.tier && a.lead !== b.lead) return b.lead - a.lead;
+    if (!a.tier && (a === lead || b === lead)) return a === lead ? -1 : 1;
     return b.boosted - a.boosted || a.index - b.index;
   });
   return scored.map(({ row }) => ({ ...row }));

@@ -62,6 +62,26 @@ test('switching to another result takes two picks, and demotes the old one', () 
   assert.equal(order('set', SETTINGS, store)[0], 'Settings: Appearance');
 });
 
+test('two picks for the typed text lead even over a stronger habit learned for related text', () => {
+  const items = [page('p.old', 'Settings old'), page('p.new', 'Settings new')];
+  let store = emptyStore();
+  for (let i = 0; i < 3; i++) store = pick(store, 'settin', items[0], T0 + i);
+  for (const text of ['se', 'set', 'setti', 'settings']) for (let i = 0; i < 6; i++) store = pick(store, text, items[0], T0 + 10 + i);
+  store = pick(store, 'sett', items[1], T0 + 100);
+  assert.equal(order('sett', items, store, T0 + 101)[0], 'Settings old', 'one pick is not enough');
+  store = pick(store, 'sett', items[1], T0 + 200);
+  assert.equal(order('sett', items, store, T0 + 201)[0], 'Settings new');
+  // The habit for the longer text is untouched: each text keeps its own leader.
+  assert.equal(order('settin', items, store, T0 + 201)[0], 'Settings old');
+});
+
+test('among results learned for exactly the typed text, the heavier one leads', () => {
+  let store = emptyStore();
+  for (let i = 0; i < 2; i++) store = pick(store, 'set', SETTINGS[2], T0 + i);
+  for (let i = 0; i < 4; i++) store = pick(store, 'set', SETTINGS[1], T0 + 10 + i);
+  assert.deepEqual(order('set', SETTINGS, store, T0 + 20).slice(0, 2), ['Site settings', 'Settings']);
+});
+
 test('a pick fades: half its weight every half-life', () => {
   let store = pick(emptyStore(), 'set', SETTINGS[1]);
   store = pick(store, 'set', SETTINGS[1]);

@@ -151,6 +151,7 @@ async function loadContext() {
     chrome.storage.local.get('learned').catch(() => ({})),
   ]);
   learned = cleanStore(saved.learned);
+  learnedLoaded = true;
   state.tab = active || null;
   state.tabs = tabs
     .filter((t) => !(surface === 'tab' && t.url === location.href) && t.id !== ownTabId)
@@ -564,15 +565,23 @@ function wireDrag() {
 
 // ---- Learned ranking ------------------------------------------------------
 
-// What was picked for which typed text (learn.js). Only this page writes it.
+// What was picked for which typed text (learn.js). Only palette pages write
+// it, each saving the whole record, so this copy must match storage first:
+// nothing is recorded until it has loaded, and it follows writes made by a
+// palette open in another tab, including a clear.
 let learned = emptyStore();
+let learnedLoaded = false;
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.learned) learned = cleanStore(changes.learned.newValue);
+});
 
 // Remembers a pick made from the root list. The write is sent before the row
 // runs, because running it can tear this page down. Returns how to take it back.
+// Without a known tab there is no telling whether the window is private, so
+// nothing is recorded then either.
 function learn(item) {
   const before = learned;
-  const isPrivate = Boolean(state.tab?.incognito || chrome.extension?.inIncognitoContext);
-  if (state.stack.length || isPrivate) return () => {};
+  if (!learnedLoaded || state.stack.length || !state.tab || state.tab.incognito) return () => {};
   learned = record(before, els.input.value, keyOf(item), Date.now());
   if (learned === before) return () => {};
   const save = (store) => chrome.storage.local.set({ learned: store }).catch(() => {});

@@ -559,6 +559,37 @@ async function uiSuite(server) {
   check('running a command from a tab closes the palette tab', page.isClosed());
   check('the command ran', (await count()) === n - 1, `${await count()} tabs`);
 
+  // Web search, from a fresh palette tab since the last one closed itself.
+  const searcher = await browser.newPage();
+  await searcher.goto(`chrome-extension://${id}/src/palette.html`);
+  await searcher.waitForSelector('.row');
+  await type(searcher, searcher.mainFrame(), 'zzqqxx wombat');
+  await searcher.keyboard.press('Enter').catch((error) => {
+    if (!/Target closed/.test(error.message)) throw error;
+  });
+  await sleep(1500);
+  const found = await sw.evaluate(async () => {
+    const tabs = await chrome.tabs.query({});
+    // The engine may redirect (Google sends automated browsers to a check page
+    // that carries the original address encoded), so compare decoded text.
+    const plain = (t) => {
+      try {
+        return decodeURIComponent(decodeURIComponent(t.pendingUrl || t.url || ''));
+      } catch {
+        return t.pendingUrl || t.url || '';
+      }
+    };
+    const hit = tabs.find((t) => /zzqqxx[+ ]wombat/.test(plain(t)));
+    return hit ? { url: plain(hit), active: hit.active } : { urls: tabs.map(plain) };
+  });
+  check('the web search row opens a search for the typed text in a new tab', Boolean(found.url), JSON.stringify(found));
+  // The throwaway profile's default engine is Google, and Chrome adds this tag to the
+  // Google searches it builds. It says nothing about other engines. This check and
+  // the one above need the network: the tab really loads the engine.
+  check('and, with Google as the default engine, the address carries the tag Chrome adds', /sourceid=chrome/.test(found.url || ''), JSON.stringify(found));
+  check('and shows that tab', found.active === true, JSON.stringify(found));
+  check('and closes the palette', searcher.isClosed());
+
   const errors = await sw.evaluate(() => (chrome.runtime.lastError ? String(chrome.runtime.lastError.message) : ''));
   check('no extension errors were recorded', errors === '', errors);
   void spy;

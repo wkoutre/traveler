@@ -1,0 +1,129 @@
+/*
+ * One block of tokens per theme. Values are copied from each design system's
+ * own token files; a line marked "addition" fills a gap the system leaves
+ * open (neither specifies a command palette).
+ *
+ * Daylight         white and warm off-white, one blue accent (light only)
+ * Cream and Coral  warm, editorial, light and dark
+ */
+
+/* ---- Daylight: white panel, warm off-white rows, ink text, pills ---------- */
+:root[data-theme='daylight'] {
+  --panel: #ffffff; /* canvas */
+  --row-hover: #fbfaf9; /* surface-beige */
+  --row-active: #f6f4ef; /* surface-sand */
+  --text: #343433; /* heading */
+  --text-2: #848281; /* muted */
+  --text-3: #848281;
+  --border: #f2f0ed; /* line */
+  --accent: #0086fc; /* accent-blue, the one bright accent */
+  --danger: #ff2b3a; /* accent-red */
+  --mark: #121212; /* ink */
+  --scrim: rgba(18, 18, 18, 0.12); /* addition: the system defines no scrim */
+  --shadow: 0 3px 16px 0 rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04); /* shadow-dropdown + ring-hairline */
+  --focus: #848281;
+  --radius-panel: 17px; /* radius-float */
+  --radius-row: 6px; /* radius-md */
+  --radius-pill: 32px;
+  --radius-kbd: 6px;
+  --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  --input-size: 17px; /* body-lg */
+  --input-tracking: -0.22px;
+  --row-size: 15px; /* label-medium */
+  --row-line: 22px;
+  --row-weight: 500;
+  --row-tracking: -0.13px;
+  --sub-size: 14px; /* caption */
+  --sub-tracking: -0.09px;
+  --section-size: 12px; /* micro */
+  --section-weight: 600;
+  --section-tracking: 0;
+  --section-case: none;
+  --pill-height: 32px;
+  --pill-pad: 12px;
+  --pill-size: 15px;
+  --pill-weight: 500;
+  --pill-bg: #fbfaf9; /* surface-beige */
+  --pill-text: #848281;
+  --pill-bg-on: #eaeaea; /* surface-stone */
+  --pill-text-on: #343433;
+  --kbd-bg: #fbfaf9;
+  --kbd-border: #e8e8e8; /* line-code */
+  --kbd-text: #474645;
+  --dur-in: 100ms; /* duration-fast */
+  --dur-out: 100ms;
+  --ease: cubic-bezier(0.19, 1, 0.22, 1); /* ease-out-expo */
+  --enter-y: 4px;
+  --enter-scale: 1;
+}
+
+/* ---- Cream and Coral: warm, editorial, coral used sparingly ------------- */
+:root[data-theme='cream'] {
+  --panel: #faf9f5; /* canvas */
+  --row-hover: #f5f0e8; /* surface-soft */
+  --row-active: #efe9de; /* surface-card */
+  --text: #141413; /* ink */
+  --text-2: #6c6a64; /* muted */
+  --text-3: #8e8b82; /* muted-soft */
+  --border: #e6dfd8; /* hairline */
+  --accent: #cc785c; /* primary */
+  --danger: #c64545; /* error */
+  --mark: #a9583e; /* primary-active, darker for text on cream */
+  --scrim: rgba(20, 20, 19, 0.32); /* addition: no scrim defined */
+  --shadow: 0 1px 3px rgba(20, 20, 19, 0.08), 0 12px 32px rgba(20, 20, 19, 0.12); /* shadow-subtle + addition */
+  --focus: #141413;
+  --radius-panel: 12px; /* lg: cards */
+  --radius-row: 6px; /* sm: menu items */
+  --radius-pill: 8px; /* md: tabs */
+  --radius-kbd: 4px;
+  --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --input-size: 16px; /* body-md */
+  --input-tracking: 0;
+  --row-size: 14px; /* body-sm */
+  --row-line: 20px;
+  --row-weight: 500;
+  --row-tracking: 0;
+  --sub-size: 13px; /* caption */
+  --sub-tracking: 0;
+  --section-size: 12px; /* caption-uppercase */
+  --section-weight: 500;
+  --section-tracking: 1.5px;
+  --section-case: uppercase;
+  --pill-height: 28px;
+  --pill-pad: 10px;
+  --pill-size: 13px;
+  --pill-weight: 500;
+  --pill-bg: transparent;
+  --pill-text: #6c6a64;
+  --pill-bg-on: #e8e0d2; /* surface-cream-strong: selected category tabs */
+  --pill-text-on: #141413;
+  --kbd-bg: transparent;
+  --kbd-border: #e6dfd8;
+  --kbd-text: #6c6a64;
+  --dur-in: 120ms; /* addition: the system defines no motion */
+  --dur-out: 80ms;
+  --ease: ease-out;
+  --enter-y: 0px;
+  --enter-scale: 1;
+}
+:root[data-theme='cream'][data-mode='dark'] {
+  --panel: #252320; /* surface-card */
+  --row-hover: #2a2724; /* surface-dark-elevated */
+  --row-active: #2e2b27; /* surface-cream-strong */
+  --text: #faf9f5;
+  --text-2: #a09d96;
+  --text-3: #8a867e;
+  --border: #34312c;
+  --danger: #e06a6a;
+  --mark: #cc785c;
+  --scrim: rgba(16, 15, 14, 0.5);
+  --shadow: 0 0 0 1px #34312c, 0 12px 32px rgba(0, 0, 0, 0.4); /* addition: no dark shadow defined */
+  --focus: #faf9f5;
+  --pill-text: #a09d96;
+  --pill-bg-on: #2e2b27;
+  --pill-text-on: #faf9f5;
+  --kbd-border: #34312c;
+  --kbd-text: #a09d96;
+}

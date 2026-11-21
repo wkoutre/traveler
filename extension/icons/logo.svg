@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Traveler: a compass in Keyline's palette (cream, ink, coral), with the same die-cut command badge. -->
+  <g transform="rotate(-6 256 256)">
+    <circle cx="246" cy="236" r="176" fill="#FFF4E8" stroke="#23242F" stroke-width="22"/>
+    <!-- needle: coral north half, ink south half -->
+    <path d="M 246 96 L 290 236 L 202 236 Z" fill="#E4572E" stroke="#23242F" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M 246 376 L 290 236 L 202 236 Z" fill="#23242F" stroke="#23242F" stroke-width="14" stroke-linejoin="round"/>
+    <circle cx="246" cy="236" r="16" fill="#FFF4E8"/>
+    <text x="376" y="468" font-family="-apple-system, 'SF Pro Display', 'Apple Symbols', 'DejaVu Sans', sans-serif" font-size="200" font-weight="800" text-anchor="middle" paint-order="stroke" stroke="#FFFFFF" stroke-width="24" stroke-linejoin="round" fill="#23242F">&#8984;</text>
+  </g>
+</svg>

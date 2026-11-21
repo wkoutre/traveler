@@ -486,6 +486,45 @@ async function uiSuite(server) {
   check('and forgets the saved position', (await stored(sw, 'positionOverlay')) === null);
   check('and reports it', (await page.$eval('#status', (e) => e.textContent)) === 'Palette position reset');
 
+  // Learned ranking. These commands open a page of choices, so the palette stays open.
+  const pickSecond = async () => {
+    await type(page, frame, 'close tabs');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await sleep(200);
+    await page.keyboard.press('Escape');
+    await sleep(200);
+  };
+  await type(page, frame, 'close tabs');
+  const plain = await titles(frame);
+  const [first, second] = plain;
+  check('test setup: the query has two different results', Boolean(first && second && first !== second), plain.slice(0, 3).join(' | '));
+  await pickSecond();
+  await type(page, frame, 'close tabs');
+  check('one pick does not change which result is first', (await titles(frame))[0] === first, (await titles(frame)).slice(0, 3).join(' | '));
+  const saved = await stored(sw, 'learned');
+  check('the pick is saved under what was typed', Object.keys(saved?.q?.['close tabs'] || {}).length === 1, JSON.stringify(saved));
+  await pickSecond();
+  await type(page, frame, 'close tabs');
+  check('two picks for the same typing put that result first', (await titles(frame))[0] === second, `${(await titles(frame)).slice(0, 3).join(' | ')}; plain order ${plain.slice(0, 3).join(' | ')}`);
+  await type(page, frame, 'close tab');
+  check('and it leads while typing toward the same text', (await titles(frame))[0] === second, (await titles(frame)).slice(0, 3).join(' | '));
+  await page.reload();
+  await page.waitForSelector('.row');
+  await type(page, frame, 'close tabs');
+  check('what was learned survives reopening the palette', (await titles(frame))[0] === second, (await titles(frame)).slice(0, 3).join(' | '));
+  await type(page, frame, 'clear learned ranking');
+  check('there is a command to clear it', (await activeTitle(frame)) === 'Clear learned ranking', await activeTitle(frame));
+  await page.keyboard.press('Enter');
+  await sleep(200);
+  check('clearing asks first', (await titles(frame)).join(' | ') === 'Clear learned ranking | Cancel', (await titles(frame)).join(' | '));
+  await page.keyboard.press('Enter');
+  await sleep(300);
+  check('confirming deletes the record', (await stored(sw, 'learned')) === null, JSON.stringify(await stored(sw, 'learned')));
+  check('and reports it', (await page.$eval('#status', (e) => e.textContent)) === 'Learned ranking cleared');
+  await type(page, frame, 'close tabs');
+  check('and results go back to the plain order', (await titles(frame)).join() === plain.join(), (await titles(frame)).slice(0, 3).join(' | '));
+
   // Tabs.
   await type(page, frame, 'plain?one');
   const n = await count();

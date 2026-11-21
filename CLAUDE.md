@@ -10,6 +10,7 @@ A Cmd+K command palette for Chrome: MV3, plain JavaScript, no dependencies, no b
 - `extension/src/catalog.js`: every command and Chrome page, as data.
 - `extension/src/fuzzy.js`: the matcher. Pure, tested in Node.
 - `extension/src/position.js`: where the palette sits (default spot, clamping, saved values). Pure, tested in Node. Saved under `positionOverlay` and `positionWindow` in `chrome.storage.local`; only the palette page writes them, and the service worker only reads `positionWindow`.
+- `extension/src/learn.js`: learned ranking (what was picked for which typed text, and how that reorders results). Pure, tested in Node. Saved under `learned` in `chrome.storage.local`; only the palette page reads or writes it, and it never records a pick from a private window.
 - `extension/src/themes.css`: one token block per theme. `boot.js` applies the theme before first paint.
 
 ## Rules

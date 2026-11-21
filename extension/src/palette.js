@@ -1,4 +1,5 @@
 import { rank } from './fuzzy.js';
+import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
 import { PAGES, buildCommands, openTab, setHomeWindow } from './catalog.js';
 import { icon } from './icons.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
@@ -142,12 +143,14 @@ async function activeTab() {
 }
 
 async function loadContext() {
-  const [active, tabs, closed, reading] = await Promise.all([
+  const [active, tabs, closed, reading, saved] = await Promise.all([
     activeTab(),
     chrome.tabs.query({}),
     chrome.sessions.getRecentlyClosed({ maxResults: 25 }).catch(() => []),
     chrome.readingList.query({}).catch(() => []),
+    chrome.storage.local.get('learned').catch(() => ({})),
   ]);
+  learned = cleanStore(saved.learned);
   state.tab = active || null;
   state.tabs = tabs
     .filter((t) => !(surface === 'tab' && t.url === location.href) && t.id !== ownTabId)
@@ -235,12 +238,13 @@ function refresh() {
   // A typed address is most likely meant literally, so "Open" leads; the web search trails.
   const head = web.filter((r) => r.item.id === 'web:open');
   const tail = web.filter((r) => r.item.id !== 'web:open');
-  setRows([...head, ...dedupe(localRows), ...tail]);
+  const learnedOrder = (rows) => arrange(dedupe(rows), learned, query, Date.now());
+  setRows([...head, ...learnedOrder(localRows), ...tail]);
   // Bookmarks and history come from Chrome's own indexes, asynchronously.
   remoteItems(query).then((remote) => {
     if (seq !== state.searchSeq) return;
     const activeId = state.rows[state.active]?.item.id;
-    const merged = dedupe([...localRows, ...rank(query, remote, bias)].sort((a, b) => b.score - a.score));
+    const merged = learnedOrder([...localRows, ...rank(query, remote, bias)].sort((a, b) => b.score - a.score));
     setRows([...head, ...merged, ...tail], activeId);
   });
 }
@@ -558,6 +562,33 @@ function wireDrag() {
   els.panel.addEventListener('pointercancel', end);
 }
 
+// ---- Learned ranking ------------------------------------------------------
+
+// What was picked for which typed text (learn.js). Only this page writes it.
+let learned = emptyStore();
+
+// Remembers a pick made from the root list. The write is sent before the row
+// runs, because running it can tear this page down. Returns how to take it back.
+function learn(item) {
+  const before = learned;
+  const isPrivate = Boolean(state.tab?.incognito || chrome.extension?.inIncognitoContext);
+  if (state.stack.length || isPrivate) return () => {};
+  learned = record(before, els.input.value, keyOf(item), Date.now());
+  if (learned === before) return () => {};
+  const save = (store) => chrome.storage.local.set({ learned: store }).catch(() => {});
+  save(learned);
+  return () => {
+    learned = before;
+    save(before);
+  };
+}
+
+async function clearLearned() {
+  learned = emptyStore();
+  await chrome.storage.local.remove('learned');
+  return { reset: true, message: 'Learned ranking cleared' };
+}
+
 // ---- Running ------------------------------------------------------------
 
 const ctx = {
@@ -572,6 +603,7 @@ const ctx = {
     return { keep: true, message };
   },
   resetPosition,
+  clearLearned,
 };
 
 function readPrefs() {
@@ -596,13 +628,14 @@ async function pushPage(item) {
     items = await item.children(ctx);
   } catch (error) {
     say(`Could not open: ${error.message}`);
-    return;
+    return false;
   }
   state.stack.push({ title: item.title, items, source: item });
   els.input.value = '';
   renderCrumbs();
   renderScopes();
   refresh();
+  return true;
 }
 
 async function popPage(message) {
@@ -626,15 +659,21 @@ async function popPage(message) {
 async function runRow(row) {
   if (!row) return;
   const { item } = row;
-  if (item.children) return pushPage(item);
+  if (item.children) {
+    const unlearn = learn(item);
+    if (!(await pushPage(item))) unlearn();
+    return;
+  }
   if (item.kind === 'action' && !state.tab && /^(tab|tabs|group|win|site)\./.test(item.id)) {
     say('No active tab');
     return;
   }
+  const unlearn = learn(item);
   let result;
   try {
     result = await item.run(ctx);
   } catch (error) {
+    unlearn();
     say(error?.message || 'That did not work');
     return;
   }

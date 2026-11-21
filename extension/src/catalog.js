@@ -647,6 +647,11 @@ function paletteCommands() {
       subtitle: 'Drag the search row, or hold Option and drag anywhere, to move it',
       run: (c) => c.resetPosition(),
     }),
+    action('palette.clearLearned', 'Clear learned ranking', 'palette', 'forget reset history picks frequent recent order memory', {
+      subtitle: 'The palette ranks what you pick often for the same typing higher',
+      children: (c) =>
+        confirm('Clear learned ranking', 'Results go back to plain text order', () => c.clearLearned()),
+    }),
     action('palette.options', 'Cmd+K options', 'gear', 'settings preferences palette', {
       run: () => chrome.runtime.openOptionsPage(),
     }),
@@ -680,4 +685,5 @@ export const GUARDED = [
   'ext.manage',
   'privacy.toggles',
   'site.permissions',
+  'palette.clearLearned',
 ];

@@ -1,6 +1,6 @@
 import { rank } from './fuzzy.js';
 import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
-import { PAGES, buildCommands, openTab, setHomeWindow } from './catalog.js';
+import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow } from './catalog.js';
 import { icon } from './icons.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
@@ -200,7 +200,7 @@ function webItems(query) {
     kind: 'web',
     title: `Search the web for “${query}”`,
     icon: 'search',
-    run: () => openTab({ url: `https://www.google.com/search?q=${encodeURIComponent(query)}` }),
+    run: () => searchWeb(query),
   });
   return items;
 }

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES, flipPrivacy, setSiteRule, resetSiteRule, heldSiteRule, openTab, setHomeWindow } from '../extension/src/catalog.js';
+import { PAGES, GUARDED, buildCommands, confirm, DATA_TYPES, RANGES, flipPrivacy, setSiteRule, resetSiteRule, heldSiteRule, openTab, setHomeWindow, searchWeb } from '../extension/src/catalog.js';
 import { ICON_NAMES } from '../extension/src/icons.js';
 
 const commands = buildCommands();
@@ -97,6 +97,7 @@ test('the manifest holds only permissions the code uses', () => {
     browsingData: 'chrome.browsingData.',
     contentSettings: 'chrome.contentSettings',
     privacy: 'chrome.privacy',
+    search: 'chrome.search.query',
   };
   assert.deepEqual([...manifest.permissions].sort(), Object.keys(evidence).sort());
   for (const [permission, needle] of Object.entries(evidence)) assert.ok(source.includes(needle), permission);
@@ -220,4 +221,50 @@ test('openTab targets the home window once one is set', async () => {
   setHomeWindow(undefined);
   assert.deepEqual(calls, [{ url: 'https://a.test/' }, { windowId: 7, url: 'https://b.test/' }, { windowId: 7 }]);
   delete globalThis.chrome;
+});
+
+function searchFake({ fail = false } = {}) {
+  const calls = [];
+  globalThis.chrome = {
+    tabs: {
+      create: async (props) => (calls.push(['create', props]), { id: 42 }),
+      update: async (id, props) => calls.push(['update', id, props]),
+      remove: async (id) => calls.push(['remove', id]),
+    },
+    search: {
+      query: async (info) => {
+        calls.push(['query', info]);
+        if (fail) throw new Error('no provider');
+      },
+    },
+  };
+  return calls;
+}
+
+test('web search runs in a new tab through the default search engine', async () => {
+  const calls = searchFake();
+  setHomeWindow(7);
+  await searchWeb('quokka facts');
+  setHomeWindow(undefined);
+  delete globalThis.chrome;
+  assert.deepEqual(calls, [
+    // Opened in the background so the toolbar popup is still alive for the next two calls.
+    ['create', { windowId: 7, active: false }],
+    ['query', { text: 'quokka facts', tabId: 42 }],
+    ['update', 42, { active: true }],
+  ]);
+});
+
+test('a web search that fails closes its empty tab and says so', async () => {
+  const calls = searchFake({ fail: true });
+  await assert.rejects(searchWeb('quokka facts'), /Could not run the search/);
+  delete globalThis.chrome;
+  assert.deepEqual(calls.map((c) => c[0]), ['create', 'query', 'remove']);
+});
+
+test('no search engine address is built into the extension', () => {
+  for (const file of ['catalog.js', 'palette.js', 'background.js']) {
+    const source = readFileSync(new URL(`../extension/src/${file}`, import.meta.url), 'utf8');
+    assert.ok(!/google\.com\/search|[?&]q=/.test(source), file);
+  }
 });

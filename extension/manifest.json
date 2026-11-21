@@ -20,7 +20,8 @@
     "management",
     "browsingData",
     "contentSettings",
-    "privacy"
+    "privacy",
+    "search"
   ],
   "background": { "service_worker": "src/background.js", "type": "module" },
   "action": { "default_popup": "src/palette.html?mode=popup", "default_title": "Cmd+K" },

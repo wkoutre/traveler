@@ -48,6 +48,7 @@ Pages are learned by address, so an open tab, a bookmark and a history entry for
 - **Downloads:** show the latest file, open the folder, clear the list.
 - **Extensions:** turn others on or off, open their options.
 - **Privacy switches and per-site permissions:** read the live value and change it.
+- **Web search:** when nothing else fits, search the web with the browser's default search engine. The extension asks the browser to run the search and never learns which engine it is.
 - **Browsing data:** delete cache, cookies, history, download history or form data for a chosen time range.
 
 Chrome has no extension API for menu-only features (Always Show Bookmarks Bar, Task Manager, Print, DevTools). Those are not reachable yet.
@@ -61,7 +62,7 @@ No content script is registered and the extension has no host permissions. The s
 - Commands that delete data, close many tabs, or change a privacy, site or extension setting never run from the first Enter. Each ends in a page with an explicit choice and a Cancel row.
 - The palette page is web-accessible so the overlay can frame it, which means any page can also frame it or open it in a tab. It stays blank unless it is the overlay with a one-time token the service worker stored for that key press, the palette's own window with the same kind of token, or the toolbar popup. The overlay frame sits in a closed shadow root so the page cannot read its URL. A page can still detect that the extension is installed.
 - A privacy switch or site permission changed from the palette is marked "set by Cmd+K". Flipping a switch back, or choosing Reset on a site permission, hands the setting back to Chrome instead of leaving the extension in control of it.
-- The extension makes no network requests of its own. Site icons come from Chrome's local favicon cache.
+- The extension makes no network requests of its own. A web search is run by the browser, with the engine set in its settings. Site icons come from Chrome's local favicon cache.
 
 ## Themes
 

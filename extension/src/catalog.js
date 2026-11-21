@@ -136,6 +136,21 @@ export function openTab(props = {}) {
   return chrome.tabs.create(homeWindowId === undefined ? props : { windowId: homeWindowId, ...props });
 }
 
+// Runs `text` through the browser's default search engine in a new tab. An
+// extension cannot read which engine that is; it can only ask for a search.
+// The tab opens in the background and is shown last, because showing it
+// closes the toolbar popup, and with it this code.
+export async function searchWeb(text) {
+  const tab = await openTab({ active: false });
+  try {
+    await chrome.search.query({ text, tabId: tab.id });
+  } catch {
+    await chrome.tabs.remove(tab.id).catch(() => {});
+    throw new Error('Could not run the search');
+  }
+  await chrome.tabs.update(tab.id, { active: true });
+}
+
 const keep = (message) => ({ keep: true, message });
 
 // The last step of every destructive command: an explicit choice. `title`

@@ -37,7 +37,7 @@ The palette remembers which result you pick for what you typed, and ranks it hig
 - **It fades.** A pick loses half its weight every 30 days, so a result picked twice and then left alone gives up first place after about three weeks.
 - **Overall use counts a little.** A result you pick often, whatever you typed, gets a small bonus that never beats a clearly better text match.
 
-Pages are learned by address, so an open tab, a bookmark and a history entry for the same address share what was learned. The record holds the text you typed and the id or address of what you picked, at most 500 pairs, in the browser profile on this machine. Picks made from a private window are not recorded, nor are web searches, steps inside a command's page of choices, or a pick made when the palette cannot tell which tab it was opened from. The command "Clear learned ranking" deletes the record.
+Pages are learned by address, so an open tab, a bookmark and a history entry for the same address share what was learned. The record holds the text you typed and the id or address of what you picked, at most 500 pairs, in the browser profile on this machine. Picks made from a private window are not recorded, nor are web searches, steps inside a command's page of choices, or a pick made when the palette cannot tell which tab it was opened from. The command "Clear learned ranking" deletes the record. Deleting browsing data, from the palette or in the browser, leaves the record in place; clear it separately.
 
 ## What it reaches
 

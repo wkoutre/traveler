@@ -356,14 +356,14 @@ async function uiSuite(server) {
   await type(page, frame, 'plain?two');
   check('open tabs are searched by URL', (await frame.$$eval('.row .tag', (els) => els[0]?.textContent)) === 'Tab');
   await type(page, frame, 'zzqqxx');
-  check('a query with no match still offers a web search, then the browser settings search', (await titles(frame)).join() === 'Search the web for “zzqqxx”,Search browser settings for “zzqqxx”', (await titles(frame)).join());
+  check('a query with no match still offers a web search, then the browser settings search', /^Search the web for “zzqqxx”,Search [\w ]+ settings for “zzqqxx”$/.test((await titles(frame)).join()), (await titles(frame)).join());
 
   // The browser's own settings search reaches settings the catalog does not list (Brave's shortcuts, say).
   await frame.$$eval('.pill', (pills) => pills.find((p) => p.textContent === 'Settings').click());
   await type(page, frame, 'hardware acceleration');
   const settingsTitles = await titles(frame);
-  check('the Settings scope offers the browser settings search', settingsTitles.includes('Search browser settings for “hardware acceleration”'), settingsTitles.join());
-  await frame.$$eval('.row', (rows) => rows.find((r) => r.textContent.includes('Search browser settings'))?.click());
+  check('the Settings scope offers the browser settings search', settingsTitles.some((t) => /^Search [\w ]+ settings for “hardware acceleration”$/.test(t)), settingsTitles.join());
+  await frame.$$eval('.row', (rows) => rows.find((r) => / settings for “/.test(r.textContent))?.click());
   await sleep(800);
   const searched = await sw.evaluate(async () => (await chrome.tabs.query({})).map((t) => t.url || t.pendingUrl));
   // Brave, Edge and Opera redirect chrome:// to their own scheme; the search must survive that.

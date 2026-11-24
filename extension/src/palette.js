@@ -3,6 +3,7 @@ import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
 import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow, themeId } from './catalog.js';
 import { icon } from './icons.js';
 import { commandTab } from './origin.js';
+import { browserName, chromeSpelling, cleanVisited, rememberPages, settingsSearchUrl, visitedPages } from './browser.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
 const surface = document.documentElement.dataset.surface || 'tab';
@@ -32,11 +33,13 @@ const SCOPE_KINDS = {
   bookmarks: ['bookmark', 'reading'],
   history: ['history', 'closed'],
 };
+// The browser's own name (Brave, Edge, ...), for labels; empty when it does not say.
+const BROWSER_NAME = browserName(navigator.userAgentData?.brands, navigator.userAgent) || (navigator.brave ? 'Brave' : '');
 const KIND_LABEL = {
   tab: 'Tab',
   closed: 'Recently closed',
   action: 'Action',
-  page: 'Chrome',
+  page: BROWSER_NAME || 'Browser',
   bookmark: 'Bookmark',
   reading: 'Reading List',
   history: 'History',
@@ -55,6 +58,7 @@ const state = {
   tabs: [],
   closed: [],
   reading: [],
+  visited: [], // internal pages (brave://, edge://, ...) seen open, see browser.js
   commands: buildCommands(),
   searchSeq: 0,
 };
@@ -126,6 +130,44 @@ function urlItem(kind, id, title, url, extra = {}) {
   };
 }
 
+// A browser page remembered from an earlier visit. Some browsers may refuse
+// to open their own scheme from an extension; chrome:// redirects there.
+function visitedItem(page) {
+  return {
+    id: `visited:${page.url}`,
+    kind: 'page',
+    section: 'Visited',
+    tag: 'Visited',
+    title: page.title || prettyUrl(page.url),
+    subtitle: page.url,
+    keywords: `${page.url} ${BROWSER_NAME.toLowerCase()} browser page settings`,
+    icon: 'gear',
+    url: page.url,
+    run: () => openInternal(page.url),
+  };
+}
+
+async function openInternal(url) {
+  try {
+    await openTab({ url });
+  } catch (error) {
+    if (url.startsWith('chrome://')) throw error;
+    await openTab({ url: chromeSpelling(url) });
+  }
+}
+
+// "Search Brave settings for …": the browser's own settings search finds every
+// setting it has, including ones only that browser offers.
+function settingsSearchItem(query) {
+  return {
+    id: 'settings:search',
+    kind: 'page',
+    title: `Search ${BROWSER_NAME || 'browser'} settings for “${query}”`,
+    icon: 'gear',
+    run: () => openTab({ url: settingsSearchUrl(query) }),
+  };
+}
+
 function prettyUrl(url = '') {
   return url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
 }
@@ -151,7 +193,7 @@ async function loadContext() {
     chrome.tabs.query({}),
     chrome.sessions.getRecentlyClosed({ maxResults: 25 }).catch(() => []),
     chrome.readingList.query({}).catch(() => []),
-    chrome.storage.local.get('learned').catch(() => ({})),
+    chrome.storage.local.get(['learned', 'visitedPages']).catch(() => ({})),
   ]);
   learned = cleanStore(saved.learned);
   learnedLoaded = true;
@@ -168,10 +210,16 @@ async function loadContext() {
       }),
     );
   state.reading = reading.map((r) => urlItem('reading', `reading:${r.url}`, r.title, r.url));
+  // Remember the browser's own pages that are open or recently closed, so they
+  // stay searchable later. Private windows are never recorded.
+  const before = cleanVisited(saved.visitedPages);
+  const visited = rememberPages(before, [...tabs, ...closed.map((s) => s.tab).filter(Boolean)]);
+  if (visited !== before) chrome.storage.local.set({ visitedPages: visited }).catch(() => {});
+  state.visited = visitedPages(visited, PAGES.map((p) => p.url)).map(visitedItem);
 }
 
 function localItems() {
-  return [...state.tabs, ...state.commands, ...PAGES, ...state.closed, ...state.reading];
+  return [...state.tabs, ...state.commands, ...PAGES, ...state.visited, ...state.closed, ...state.reading];
 }
 
 function inScope(item) {
@@ -205,6 +253,7 @@ function webItems(query) {
     icon: 'search',
     run: () => searchWeb(query),
   });
+  items.push(settingsSearchItem(query));
   return items;
 }
 
@@ -238,7 +287,7 @@ function refresh() {
   }
   const bias = (item) => KIND_BIAS[item.kind] || 0;
   const localRows = rank(query, local, bias);
-  const web = state.scope === 'all' ? webItems(query).map((item) => ({ item, positions: [] })) : [];
+  const web = (state.scope === 'all' ? webItems(query) : state.scope === 'settings' ? [settingsSearchItem(query)] : []).map((item) => ({ item, positions: [] }));
   // A typed address is most likely meant literally, so "Open" leads; the web search trails.
   const head = web.filter((r) => r.item.id === 'web:open');
   const tail = web.filter((r) => r.item.id !== 'web:open');
@@ -341,7 +390,7 @@ function rowElement(row, index) {
   const tag = document.createElement('span');
   tag.className = 'tag';
   if (item.children) tag.append(icon('chevron'));
-  else if (!state.stack.length) tag.textContent = item.current ? 'Current tab' : KIND_LABEL[item.kind] || '';
+  else if (!state.stack.length) tag.textContent = item.current ? 'Current tab' : item.tag || KIND_LABEL[item.kind] || '';
 
   el.append(lead, text, tag);
   return el;
@@ -597,8 +646,8 @@ function learn(item) {
 
 async function clearLearned() {
   learned = emptyStore();
-  await chrome.storage.local.remove('learned');
-  return { reset: true, message: 'Learned ranking cleared' };
+  await chrome.storage.local.remove(['learned', 'visitedPages']);
+  return { reset: true, message: 'Learned ranking and remembered pages cleared' };
 }
 
 // ---- Running ------------------------------------------------------------

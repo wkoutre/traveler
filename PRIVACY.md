@@ -23,7 +23,8 @@ Kept in `chrome.storage.local`, on this computer only, never synced:
 - Your preferences: theme and light or dark appearance.
 - Where you last left the palette on screen.
 - The per-site permissions you changed from the palette, so a Reset can hand them back to Chrome.
-- Learned ranking: the text you typed and the id or address of the result you picked, at most 500 pairs, so the palette can rank your usual picks first. Picks made in a private window are never recorded. The palette command "Clear learned ranking" deletes the record.
+- Browser pages you had open: the address and title of your browser's own pages (such as `brave://rewards` or `chrome://settings/system`) seen open or recently closed, at most 150, so they stay searchable after you close them. Pages in private windows are never recorded. Web pages are never recorded here.
+- Learned ranking: the text you typed and the id or address of the result you picked, at most 500 pairs, so the palette can rank your usual picks first. Picks made in a private window are never recorded. The palette command "Clear learned ranking" deletes the record and the remembered browser pages.
 
 Removing the extension removes all of it.
 

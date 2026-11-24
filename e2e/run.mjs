@@ -387,7 +387,20 @@ async function uiSuite(server) {
   await page.waitForSelector('.row');
   await type(page, frame, 'omnibox');
   const tags = await frame.$$eval('.row', (rows) => rows.map((r) => `${r.querySelector('.title')?.textContent}|${r.querySelector('.tag')?.textContent}`));
-  check('a browser page that was open is still found after it closed', tags.some((t) => t.endsWith('|Visited')), tags.join(' ; '));
+  // While it is in Recently closed it has that row; Visited takes over once it is not.
+  check('a browser page that was open is still found after it closed', tags.filter((t) => /\|(Visited|Recently closed)$/.test(t)).length === 1, tags.join(' ; '));
+  await sw.evaluate(async (base) => {
+    // Recently closed cannot be emptied directly; close other pages until omnibox scrolls out of the 25 shown.
+    const opened = [];
+    for (let i = 0; i < 26; i++) opened.push(await chrome.tabs.create({ url: `${base}/plain?filler${i}`, active: false }));
+    await new Promise((r) => setTimeout(r, 800));
+    for (const t of opened) await chrome.tabs.remove(t.id);
+  }, base);
+  await page.reload();
+  await page.waitForSelector('.row');
+  await type(page, frame, 'omnibox');
+  const later = await frame.$$eval('.row .tag', (els) => els.map((e) => e.textContent));
+  check('and is listed under Visited once it leaves Recently closed', later.includes('Visited') && !later.includes('Recently closed'), later.join());
   const remembered = await sw.evaluate(async () => Object.keys((await chrome.storage.local.get('visitedPages')).visitedPages || {}));
   check('and is stored under its scheme-free key', remembered.includes('chrome://omnibox'), remembered.join());
   await type(page, frame, 'example.com/x');

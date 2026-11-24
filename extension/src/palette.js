@@ -215,7 +215,9 @@ async function loadContext() {
   const before = cleanVisited(saved.visitedPages);
   const visited = rememberPages(before, [...tabs, ...closed.map((s) => s.tab).filter(Boolean)]);
   if (visited !== before) chrome.storage.local.set({ visitedPages: visited }).catch(() => {});
-  state.visited = visitedPages(visited, PAGES.map((p) => p.url)).map(visitedItem);
+  // A page that is open or in Recently closed already has a row of its own.
+  const listed = [...PAGES.map((p) => p.url), ...tabs.map((t) => t.url), ...closed.map((s) => s.tab?.url)].filter(Boolean);
+  state.visited = visitedPages(visited, listed).map(visitedItem);
 }
 
 function localItems() {

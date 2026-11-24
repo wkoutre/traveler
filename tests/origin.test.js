@@ -4,11 +4,13 @@ import { readFileSync } from 'node:fs';
 import { commandTab, lastNormalWindow } from '../extension/src/origin.js';
 
 const active = { id: 11, windowId: 3, active: true };
-function fakeApi(win, { fail = false } = {}) {
+const PALETTE = 'chrome-extension://abc/src/palette.html';
+function fakeApi(win, { fail = false, active: actives = [] } = {}) {
   const asked = [];
   return {
     asked,
-    tabs: { TAB_ID_NONE: -1 },
+    runtime: { getURL: (p) => `chrome-extension://abc/${p}` },
+    tabs: { TAB_ID_NONE: -1, query: async () => actives },
     windows: {
       getLastFocused: async (opts) => {
         asked.push(opts);
@@ -32,6 +34,14 @@ test('a command fired without a tab (Dia) acts on the active tab of the last nor
   assert.equal(await commandTab({ id: -1 }, api), active, 'TAB_ID_NONE counts as no tab');
   // The palette's own popup must never be picked as the window to act on.
   assert.deepEqual(api.asked[0], { populate: true, windowTypes: ['normal'] });
+});
+
+test('a browser that reports no normal window (Dia and Arc draw their own) falls back to the latest active tab', async () => {
+  const palette = { id: 20, active: true, url: `${PALETTE}?mode=window`, lastAccessed: 999 };
+  const older = { id: 21, active: true, url: 'https://a.test/', lastAccessed: 1 };
+  const newer = { id: 22, active: true, url: 'https://b.test/', lastAccessed: 5 };
+  assert.equal(await commandTab(undefined, fakeApi(null, { fail: true, active: [older, palette, newer] })), newer);
+  assert.equal(await commandTab(undefined, fakeApi({ type: 'normal', tabs: [palette] }, { active: [older] })), older, 'the palette is never the tab');
 });
 
 test('no window, or a lookup that throws, means no tab rather than an error', async () => {

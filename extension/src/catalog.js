@@ -684,9 +684,9 @@ function paletteCommands() {
       run: (c) => c.resetPosition(),
     }),
     action('palette.clearLearned', 'Clear learned ranking', 'palette', 'forget reset history picks frequent recent order memory', {
-      subtitle: 'The palette ranks what you pick often for the same typing higher',
+      subtitle: 'Your usual picks, and the browser pages it remembers you opening',
       children: (c) =>
-        confirm('Clear learned ranking', 'Results go back to plain text order', () => c.clearLearned()),
+        confirm('Clear learned ranking', 'Results go back to plain text order and remembered browser pages are forgotten', () => c.clearLearned()),
     }),
     action('palette.options', 'Traveler options', 'gear', 'settings preferences palette cmdk', {
       run: () => chrome.runtime.openOptionsPage(),

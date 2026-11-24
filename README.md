@@ -54,6 +54,7 @@ Pages are learned by address, so an open tab, a bookmark and a history entry for
 - **Tabs and windows:** switch, close, pin, mute, duplicate, reload, move to a new window, zoom, close others or duplicates, discard background tabs, merge windows.
 - **Tab groups:** add to a group, ungroup, collapse or expand all, group by site.
 - **Chrome pages:** every settings section and the internal pages listed in `extension/src/catalog.js`.
+- **Your browser's own settings:** "Search Brave settings for …" (or Edge, Opera, Chrome) hands the text to the browser's own settings search, so settings only that browser has are found too. Its internal pages you have had open (`brave://rewards`, `edge://settings/...`) stay searchable afterwards under Visited.
 - **Bookmarks, history, Reading List, recently closed tabs:** search and open.
 - **Downloads:** show the latest file, open the folder, clear the list.
 - **Extensions:** turn others on or off, open their options.

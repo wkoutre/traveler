@@ -340,10 +340,10 @@ async function uiSuite(server) {
   }, base);
   // The plain-tab surface only renders with this flag, which web pages cannot set.
   await sw.evaluate(() => chrome.storage.session.set({ devTab: true }));
-  const page = await browser.newPage();
+  let page = await browser.newPage();
   await page.goto(`chrome-extension://${id}/src/palette.html`);
   await page.waitForSelector('.row');
-  const frame = page.mainFrame();
+  let frame = page.mainFrame();
   const count = () => sw.evaluate(async () => (await chrome.tabs.query({})).length);
 
   const sections = await page.$$eval('.section', (els) => els.map((e) => e.textContent));
@@ -356,7 +356,53 @@ async function uiSuite(server) {
   await type(page, frame, 'plain?two');
   check('open tabs are searched by URL', (await frame.$$eval('.row .tag', (els) => els[0]?.textContent)) === 'Tab');
   await type(page, frame, 'zzqqxx');
-  check('a query with no match still offers a web search', (await titles(frame)).join() === 'Search the web for “zzqqxx”', (await titles(frame)).join());
+  check('a query with no match still offers a web search, then the browser settings search', /^Search the web for “zzqqxx”,Search [\w ]+ settings for “zzqqxx”$/.test((await titles(frame)).join()), (await titles(frame)).join());
+
+  // The browser's own settings search reaches settings the catalog does not list (Brave's shortcuts, say).
+  await frame.$$eval('.pill', (pills) => pills.find((p) => p.textContent === 'Settings').click());
+  await type(page, frame, 'hardware acceleration');
+  const settingsTitles = await titles(frame);
+  check('the Settings scope offers the browser settings search', settingsTitles.some((t) => /^Search [\w ]+ settings for “hardware acceleration”$/.test(t)), settingsTitles.join());
+  await frame.$$eval('.row', (rows) => rows.find((r) => / settings for “/.test(r.textContent))?.click());
+  await sleep(800);
+  const searched = await sw.evaluate(async () => (await chrome.tabs.query({})).map((t) => t.url || t.pendingUrl));
+  // Brave, Edge and Opera redirect chrome:// to their own scheme; the search must survive that.
+  check('it opens the settings page with that search', searched.some((u) => /^[a-z]+:\/\/settings\/\?search=hardware%20acceleration$/.test(u)), searched.join(' '));
+  const settingsPage = (await browser.pages()).find((p) => /:\/\/settings\/\?search=/.test(p.url()));
+  const box = settingsPage ? await settingsPage.$eval('pierce/#searchInput', (e) => e.value).catch(() => null) : null;
+  check('and the settings page is filtered by it', box === 'hardware acceleration', String(box));
+  // Running a row closes the palette tab; open a fresh one.
+  page = await browser.newPage();
+  await page.goto(`chrome-extension://${id}/src/palette.html`);
+  await page.waitForSelector('.row');
+  frame = page.mainFrame();
+
+  // An internal page the catalog does not list is remembered once it has been open.
+  const omnibox = await sw.evaluate(async () => (await chrome.tabs.create({ url: 'chrome://omnibox/', active: false })).id);
+  await sleep(500);
+  await page.reload();
+  await page.waitForSelector('.row');
+  await sw.evaluate((id) => chrome.tabs.remove(id), omnibox);
+  await page.reload();
+  await page.waitForSelector('.row');
+  await type(page, frame, 'omnibox');
+  const tags = await frame.$$eval('.row', (rows) => rows.map((r) => `${r.querySelector('.title')?.textContent}|${r.querySelector('.tag')?.textContent}`));
+  // While it is in Recently closed it has that row; Visited takes over once it is not.
+  check('a browser page that was open is still found after it closed', tags.filter((t) => /\|(Visited|Recently closed)$/.test(t)).length === 1, tags.join(' ; '));
+  await sw.evaluate(async (base) => {
+    // Recently closed cannot be emptied directly; close other pages until omnibox scrolls out of the 25 shown.
+    const opened = [];
+    for (let i = 0; i < 26; i++) opened.push(await chrome.tabs.create({ url: `${base}/plain?filler${i}`, active: false }));
+    await new Promise((r) => setTimeout(r, 800));
+    for (const t of opened) await chrome.tabs.remove(t.id);
+  }, base);
+  await page.reload();
+  await page.waitForSelector('.row');
+  await type(page, frame, 'omnibox');
+  const later = await frame.$$eval('.row .tag', (els) => els.map((e) => e.textContent));
+  check('and is listed under Visited once it leaves Recently closed', later.includes('Visited') && !later.includes('Recently closed'), later.join());
+  const remembered = await sw.evaluate(async () => Object.keys((await chrome.storage.local.get('visitedPages')).visitedPages || {}));
+  check('and is stored under its scheme-free key', remembered.includes('chrome://omnibox'), remembered.join());
   await type(page, frame, 'example.com/x');
   check('a URL-shaped query offers to open it first', (await titles(frame))[0] === 'Open example.com/x');
 
@@ -547,7 +593,7 @@ async function uiSuite(server) {
   await page.keyboard.press('Enter');
   await sleep(300);
   check('confirming deletes the record', (await stored(sw, 'learned')) === null, JSON.stringify(await stored(sw, 'learned')));
-  check('and reports it', (await page.$eval('#status', (e) => e.textContent)) === 'Learned ranking cleared');
+  check('and reports it', (await page.$eval('#status', (e) => e.textContent)) === 'Learned ranking and remembered pages cleared');
   await type(page, frame, 'close tabs');
   check('and results go back to the plain order', (await titles(frame)).join() === plain.join(), (await titles(frame)).slice(0, 3).join(' | '));
 

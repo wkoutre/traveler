@@ -82,6 +82,9 @@ const fire = (sw) =>
     chrome.commands.onCommand.dispatch('open-palette', tab);
   });
 
+// Dia fires the command without a tab argument.
+const fireBare = (sw) => sw.evaluate(() => chrome.commands.onCommand.dispatch('open-palette'));
+
 async function paletteFrame(page, id, timeout = 3000) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
@@ -159,6 +162,15 @@ async function overlaySuite(server) {
   await sleep(150);
   check('Escape closes the overlay', !(await hostExists(page)));
   check('focus returns to the field that had it', (await page.evaluate(() => document.activeElement?.id)) === 'field');
+
+  await fireBare(sw);
+  frame = await paletteFrame(page, id);
+  check('a command fired without a tab (as Dia does) still opens the overlay', Boolean(frame));
+  if (frame) {
+    await frame.waitForSelector('.row');
+    await page.keyboard.press('Escape');
+    await sleep(150);
+  }
 
   await fire(sw);
   await paletteFrame(page, id);
@@ -706,6 +718,24 @@ async function windowSuite() {
     await sleep(400);
   }
   await sw.evaluate(() => chrome.storage.local.remove('positionWindow'));
+
+  // Dia fires the command without a tab. The window must still open Chrome pages in the browser window.
+  await page.bringToFront();
+  await fireBare(sw);
+  target = await paletteTarget();
+  check('a command fired without a tab opens the palette window', Boolean(target));
+  if (target) {
+    const bare = await target.page();
+    await bare.waitForSelector('.row');
+    await type(bare, bare.mainFrame(), 'extensions');
+    check('Extensions is the best match', (await activeTitle(bare.mainFrame())) === 'Extensions', await activeTitle(bare.mainFrame()));
+    await bare.keyboard.press('Enter').catch(() => {});
+    await sleep(600);
+    const all = await windows();
+    const home = all.find((w) => w.urls.includes('chrome://version/'));
+    check('choosing chrome://extensions opens it in the browser window', home.urls.some((u) => u.startsWith('chrome://extensions')), JSON.stringify(home.urls));
+    check('and the palette window is gone', all.every((w) => w.type !== 'popup'));
+  }
 
   const stray = await browser.newPage();
   await stray.goto(`chrome-extension://${id}/src/palette.html?mode=window#guess`);

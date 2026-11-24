@@ -132,8 +132,22 @@ let homeWindowId;
 export function setHomeWindow(id) {
   homeWindowId = id;
 }
-export function openTab(props = {}) {
-  return chrome.tabs.create(homeWindowId === undefined ? props : { windowId: homeWindowId, ...props });
+export async function openTab(props = {}) {
+  if (homeWindowId === undefined) return chrome.tabs.create(props);
+  const tab = await chrome.tabs.create({ windowId: homeWindowId, ...props });
+  if (props.active !== false) await focusHome();
+  return tab;
+}
+
+// Bring the browser window forward, or a new tab can open out of sight behind
+// the palette's window as it closes.
+async function focusHome() {
+  if (homeWindowId === undefined) return;
+  try {
+    await chrome.windows.update(homeWindowId, { focused: true });
+  } catch {
+    // The window closed meanwhile; the tab is there all the same.
+  }
 }
 
 // Runs `text` through the browser's default search engine in a new tab. An
@@ -150,6 +164,7 @@ export async function searchWeb(text) {
     throw new Error(error?.message ? `Could not run the search: ${error.message}` : 'Could not run the search');
   }
   await chrome.tabs.update(tab.id, { active: true });
+  await focusHome();
 }
 
 const keep = (message) => ({ keep: true, message });

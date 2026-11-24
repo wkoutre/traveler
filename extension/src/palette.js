@@ -2,6 +2,7 @@ import { rank } from './fuzzy.js';
 import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
 import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow, themeId } from './catalog.js';
 import { icon } from './icons.js';
+import { commandTab } from './origin.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
 const surface = document.documentElement.dataset.surface || 'tab';
@@ -137,7 +138,9 @@ let ownTabId = null;
 async function activeTab() {
   if (surface !== 'window') return (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
   ownTabId ??= (await chrome.tabs.getCurrent())?.id ?? null;
-  const origin = originTabId ? await chrome.tabs.get(originTabId).catch(() => null) : null;
+  // Without a tab from the service worker (or once it closed), fall back to the
+  // browser window the user was last in, so tabs never open next to the palette.
+  const origin = (originTabId ? await chrome.tabs.get(originTabId).catch(() => null) : null) ?? (await commandTab(null));
   if (origin) setHomeWindow(origin.windowId);
   return origin;
 }

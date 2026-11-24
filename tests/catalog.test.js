@@ -206,7 +206,7 @@ test('tabs are opened through openTab and queries never use currentWindow', () =
   for (const file of ['catalog.js', 'palette.js', 'options.js']) {
     const source = readFileSync(new URL(`../extension/src/${file}`, import.meta.url), 'utf8');
     const direct = source.match(/chrome\.tabs\.create\(/g) || [];
-    assert.equal(direct.length, file === 'catalog.js' ? 1 : file === 'options.js' ? 1 : 0, `${file} calls chrome.tabs.create directly`);
+    assert.equal(direct.length, file === 'catalog.js' ? 2 : file === 'options.js' ? 1 : 0, `${file} calls chrome.tabs.create directly`);
     if (file !== 'palette.js') assert.equal(source.includes('currentWindow'), false, `${file} uses currentWindow`);
   }
 });
@@ -221,6 +221,27 @@ test('openTab targets the home window once one is set', async () => {
   setHomeWindow(undefined);
   assert.deepEqual(calls, [{ url: 'https://a.test/' }, { windowId: 7, url: 'https://b.test/' }, { windowId: 7 }]);
   delete globalThis.chrome;
+});
+
+test('opening a tab from the palette window brings the browser window forward', async () => {
+  // Dia left chrome://extensions behind the closing palette window: the tab opened, out of sight.
+  const calls = [];
+  globalThis.chrome = {
+    tabs: { create: async (props) => (calls.push(['create', props]), { id: 1 }) },
+    windows: { update: async (id, props) => calls.push(['focus', id, props]) },
+  };
+  setHomeWindow(7);
+  await openTab({ url: 'chrome://extensions/' });
+  await openTab({ active: false });
+  setHomeWindow(undefined);
+  await openTab({ url: 'https://a.test/' });
+  delete globalThis.chrome;
+  assert.deepEqual(calls, [
+    ['create', { windowId: 7, url: 'chrome://extensions/' }],
+    ['focus', 7, { focused: true }],
+    ['create', { windowId: 7, active: false }],
+    ['create', { url: 'https://a.test/' }],
+  ]);
 });
 
 function searchFake({ fail = false } = {}) {

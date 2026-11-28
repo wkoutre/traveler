@@ -653,7 +653,7 @@ async function uiSuite(server) {
 }
 
 // ---- Pages that cannot be scripted: a centered window ---------------------
-async function windowSuite() {
+async function windowSuite(server) {
   // The shipped manifest, unmodified: injection into chrome:// fails for real.
   // Headless Chrome's default screen is 800x600, too small to move a 680x520 window around in.
   const { browser, id } = await launch(path.join(here, '../extension'), { args: ['--screen-info={1920x1200}'] });
@@ -681,6 +681,7 @@ async function windowSuite() {
   check('it sits in the upper part of the browser window', pop.top >= main.top && pop.top < main.top + main.height / 2);
   check('it is not the toolbar popup', (await palette.evaluate(() => document.documentElement.dataset.surface)) === 'window');
   check('the palette window itself is not listed as a tab', !(await titles(palette.mainFrame())).includes('Traveler'));
+  check('a browser page that no access could open is not offered website access', !(await titles(palette.mainFrame())).some((t) => t.startsWith('Open Traveler over the page')));
 
   await type(palette, palette.mainFrame(), 'pin');
   await palette.keyboard.press('Enter').catch(() => {});
@@ -783,6 +784,24 @@ async function windowSuite() {
     check('and the palette window is gone', all.every((w) => w.type !== 'popup'));
   }
 
+  // Dia grants the shortcut no activeTab, so even a web page cannot be scripted.
+  // The shipped manifest has no host access either, which is the same situation.
+  const web = await browser.newPage();
+  await web.goto(`http://localhost:${server.address().port}/dia`);
+  await web.bringToFront();
+  await fireBare(sw);
+  target = await paletteTarget();
+  check('a web page the key press got no access to opens the palette window', Boolean(target));
+  if (target) {
+    const denied = await target.page();
+    await denied.waitForSelector('.row');
+    await denied.screenshot({ path: path.join(outDir, 'window-no-access.png') });
+    check('the window offers website access as its first row', (await activeTitle(denied.mainFrame())) === 'Open Traveler over the page, not in a window', await activeTitle(denied.mainFrame()));
+    check('and that row is marked Allow', (await denied.$eval('.row[aria-selected="true"] .tag', (e) => e.textContent).catch(() => '')) === 'Allow');
+    await denied.keyboard.press('Escape').catch(() => {});
+    await sleep(400);
+  }
+
   const stray = await browser.newPage();
   await stray.goto(`chrome-extension://${id}/src/palette.html?mode=window#guess`);
   await sleep(400);
@@ -840,7 +859,7 @@ const server = await startServer();
 try {
   if (want('overlay')) await overlaySuite(server);
   if (want('ui')) await uiSuite(server);
-  if (want('window')) await windowSuite();
+  if (want('window')) await windowSuite(server);
   if (want('pages')) await pagesSuite();
   if (want('idle')) await idleSuite(server);
 } finally {

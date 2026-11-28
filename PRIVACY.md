@@ -33,6 +33,7 @@ Removing the extension removes all of it.
 Each permission is used only when you act in the palette:
 
 - `activeTab`, `scripting`: show the palette over the current page when you press the shortcut.
+- Optional access to websites: asked for only if you choose it, on browsers that give the shortcut no access to the page (Dia). Used only to show the palette over the page when you press the shortcut; Traveler reads nothing from pages.
 - `storage`: your preferences, palette position and learned ranking, as above.
 - `tabs`, `tabGroups`: search, switch, close, pin, mute, move and group tabs.
 - `bookmarks`, `history`, `readingList`, `sessions`: search and open bookmarks, history, Reading List items and recently closed tabs.

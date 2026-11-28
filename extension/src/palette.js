@@ -3,7 +3,7 @@ import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
 import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow, themeId } from './catalog.js';
 import { icon } from './icons.js';
 import { commandTab } from './origin.js';
-import { SITE_ACCESS, openOverlay } from './overlay.js';
+import { hasAccess } from './access.js';
 import { browserName, chromeSpelling, cleanVisited, rememberPages, settingsSearchUrl, visitedPages } from './browser.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
@@ -182,11 +182,9 @@ let ownTabId = null;
 // only because the browser gave the key press no access to it (Dia does not
 // grant activeTab to shortcuts). Allowing access to websites fixes that for good.
 const noAccess = surface === 'window' && new URLSearchParams(location.search).get('access') === 'none';
-let asking = false;
-
 async function accessItem(tab) {
   if (!noAccess || !/^https?:/.test(tab?.url || '')) return null;
-  if (await chrome.permissions.contains(SITE_ACCESS).catch(() => false)) return null;
+  if (await hasAccess()) return null;
   const where = BROWSER_NAME || 'This browser';
   return {
     id: 'traveler.siteAccess',
@@ -197,31 +195,10 @@ async function accessItem(tab) {
     subtitle: `${where} keeps the shortcut out of pages. Allow websites once.`,
     keywords: 'allow access websites overlay window permission inside page',
     icon: 'shield',
-    run: allowSiteAccess,
+    // Dia shows no permission prompt for this small window and never answers
+    // the request, so ask from Traveler's settings in a normal tab instead.
+    run: () => openTab({ url: `${chrome.runtime.getURL('src/options.html')}#site-access` }),
   };
-}
-
-async function allowSiteAccess() {
-  // The browser's permission prompt takes focus; the window must outlive it.
-  asking = true;
-  let granted = false;
-  try {
-    granted = await chrome.permissions.request(SITE_ACCESS);
-  } finally {
-    asking = false;
-  }
-  if (!granted) {
-    window.focus();
-    return { keep: true, message: 'Not allowed. Traveler keeps opening in a window on websites here.' };
-  }
-  state.access = null;
-  await chrome.storage.session.remove('paletteWindow');
-  // Move to the page right away; every later press opens there directly.
-  const tab = state.tab?.id ? await chrome.tabs.get(state.tab.id).catch(() => null) : null;
-  if (tab) {
-    await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
-    await openOverlay(tab);
-  }
 }
 
 async function activeTab() {
@@ -871,7 +848,15 @@ function onKeydown(event) {
 function wire() {
   els.input.addEventListener('input', refresh);
   document.addEventListener('keydown', onKeydown);
+  // Only a pointer that really moves picks a row. A window or overlay that opens
+  // under a resting pointer gets a mousemove too, which used to move the
+  // selection off the top row, so Enter ran whatever sat under the mouse.
+  let pointer = null;
   els.list.addEventListener('mousemove', (event) => {
+    const at = `${event.screenX},${event.screenY}`;
+    const moved = pointer !== null && pointer !== at;
+    pointer = at;
+    if (!moved) return;
     const row = event.target.closest('.row');
     if (row && Number(row.dataset.index) !== state.active) setActive(Number(row.dataset.index), false);
   });
@@ -906,7 +891,7 @@ async function start() {
     return;
   }
   // Like Spotlight, the palette's own window goes away when focus leaves it.
-  if (surface === 'window') window.addEventListener('blur', () => asking || close());
+  if (surface === 'window') window.addEventListener('blur', close);
   $('search-icon').append(icon('search'));
   wire();
   wireDrag();

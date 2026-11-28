@@ -799,8 +799,18 @@ async function windowSuite(server) {
     await denied.screenshot({ path: path.join(outDir, 'window-no-access.png') });
     check('the window offers website access as its first row', (await activeTitle(denied.mainFrame())) === 'Open Traveler over the page, not in a window', await activeTitle(denied.mainFrame()));
     check('and that row is marked Allow', (await denied.$eval('.row[aria-selected="true"] .tag', (e) => e.textContent).catch(() => '')) === 'Allow');
-    await denied.keyboard.press('Escape').catch(() => {});
-    await sleep(400);
+    // Dia shows no permission prompt for the palette's small window, so the row
+    // asks from Traveler's settings in a normal tab of the browser window.
+    await denied.keyboard.press('Enter').catch(() => {});
+    await sleep(600);
+    const settings = (await browser.pages()).find((p) => p.url().endsWith('/src/options.html#site-access'));
+    check('choosing it opens the website-access settings in a tab', Boolean(settings));
+    if (settings) {
+      await settings.waitForSelector('#access-allow');
+      check('which offer an Allow button', await settings.$eval('#access-allow', (e) => !e.hidden));
+      await settings.close();
+    }
+    check('and the palette window is gone', (await windows()).every((w) => w.type !== 'popup'));
   }
 
   const stray = await browser.newPage();

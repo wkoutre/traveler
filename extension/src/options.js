@@ -1,4 +1,6 @@
-import { THEMES, APPEARANCES, themeId } from './catalog.js';
+import { THEMES, APPEARANCES, openTab, themeId } from './catalog.js';
+import { detailsUrl, hasAccess, requestAccess } from './access.js';
+import { SITE_ACCESS } from './overlay.js';
 
 function readPrefs() {
   try {
@@ -56,4 +58,43 @@ async function start() {
   });
 }
 
+// Some browsers (Dia) give the shortcut no access to the page, so the palette
+// opens in a window there until Traveler is allowed on websites. Chrome never needs this.
+const $ = (id) => document.getElementById(id);
+
+async function renderAccess(message) {
+  const allowed = await hasAccess();
+  $('access-status').textContent =
+    message ||
+    (allowed
+      ? 'Allowed. On browsers that give the shortcut no access to the page, the palette still opens over it.'
+      : 'Not needed in Chrome. If the palette opens in its own window on websites, allow Traveler on websites here.');
+  $('access-allow').hidden = allowed;
+  $('access-remove').hidden = !allowed;
+  if (allowed) $('access-manual').hidden = true;
+}
+
+function wireAccess() {
+  $('access-allow').addEventListener('click', async () => {
+    $('access-status').textContent = 'Waiting for the browser’s prompt…';
+    const result = await requestAccess();
+    if (result === 'no-prompt') $('access-manual').hidden = false;
+    await renderAccess(
+      result === 'granted'
+        ? 'Allowed. Press the shortcut on any website and the palette opens over the page.'
+        : result === 'denied'
+          ? 'Not allowed. The palette keeps opening in its own window on websites.'
+          : '',
+    );
+  });
+  $('access-remove').addEventListener('click', async () => {
+    await chrome.permissions.remove(SITE_ACCESS).catch(() => {});
+    await renderAccess();
+  });
+  $('access-details').addEventListener('click', () => openTab({ url: detailsUrl() }));
+  chrome.permissions.onAdded?.addListener(() => renderAccess());
+  renderAccess();
+}
+
+wireAccess();
 start();

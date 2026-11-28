@@ -680,6 +680,7 @@ async function windowSuite(server) {
   check('it is centered horizontally over the browser window', offCenter <= 2, `${offCenter}px off; popup ${JSON.stringify(pop)} main ${JSON.stringify({ left: main.left, top: main.top, width: main.width, height: main.height })}`);
   check('it sits in the upper part of the browser window', pop.top >= main.top && pop.top < main.top + main.height / 2);
   check('it is not the toolbar popup', (await palette.evaluate(() => document.documentElement.dataset.surface)) === 'window');
+  check('the search field has the keyboard when the window opens', await palette.evaluate(() => document.activeElement?.id === 'input'));
   check('the palette window itself is not listed as a tab', !(await titles(palette.mainFrame())).includes('Traveler'));
   check('a browser page that no access could open is not offered website access', !(await titles(palette.mainFrame())).some((t) => t.startsWith('Open Traveler over the page')));
 

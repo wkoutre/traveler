@@ -10,7 +10,13 @@ chrome.commands.onCommand.addListener(async (command, passed) => {
   // injected and the palette window has no browser window to act on.
   const tab = await commandTab(passed);
   const overlay = await openOverlay(tab);
-  if (overlay === 'opened' || overlay === 'closed') return;
+  if (overlay === 'opened') {
+    // Dia leaves keyboard focus in its own chrome after the shortcut, so the
+    // page (and the palette in it) would not get the keys. Hand it back.
+    await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+    return;
+  }
+  if (overlay === 'closed') return;
   // The browser's own pages, the Web Store and the PDF viewer cannot be
   // scripted, so there the palette gets a small centered window of its own.
   // So does a web page the browser gave this key press no access to (Dia);
@@ -54,6 +60,8 @@ async function toggleWindow(tab, noAccess) {
       .create({ ...frame, ...windowSpot(parent, positionWindow) })
       .catch(() => chrome.windows.create({ ...frame, ...windowSpot(parent) }));
     await chrome.storage.session.set({ paletteWindow: created.id });
+    // Dia creates the window without activating it, despite focused: true.
+    await chrome.windows.update(created.id, { focused: true }).catch(() => {});
     return true;
   } catch {
     return false;

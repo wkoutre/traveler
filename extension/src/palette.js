@@ -886,7 +886,17 @@ function wire() {
       event.preventDefault();
     }
   });
-  window.addEventListener('focus', () => els.input.focus());
+  window.addEventListener('focus', () => els.input.focus({ preventScroll: true }));
+}
+
+// Typing must land in the field the moment the palette shows. Some browsers
+// (Dia) activate the palette's window or frame a beat after it loads, or not
+// at all, so keep asking until the field really has the keyboard.
+function focusField(deadline = performance.now() + 1500) {
+  window.focus();
+  els.input.focus({ preventScroll: true });
+  if (document.hasFocus() && document.activeElement === els.input) return;
+  if (performance.now() < deadline) requestAnimationFrame(() => focusField(deadline));
 }
 
 async function start() {
@@ -904,7 +914,8 @@ async function start() {
   else if (movable) await restorePanel();
   renderScopes();
   els.panel.hidden = false;
-  els.input.focus();
+  focusField();
+  if (surface === 'window' && own.id) chrome.windows.update(own.id, { focused: true }).catch(() => {});
   await loadContext();
   // Show the shortcut as it is bound now, since it can be changed in Chrome.
   const bound = (await chrome.commands.getAll()).find((c) => c.name === 'open-palette')?.shortcut;

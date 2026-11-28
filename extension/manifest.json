@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Traveler: Command Palette for Chrome Tabs, Bookmarks & Settings",
   "short_name": "Traveler",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Press Cmd+K to search tabs, bookmarks, history and every Chrome setting, and run browser actions. Free, open source, no tracking.",
   "minimum_chrome_version": "127",
   "icons": {

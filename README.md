@@ -68,7 +68,7 @@ Chrome has no extension API for menu-only features (Always Show Bookmarks Bar, T
 
 No content script is registered and the extension has no host permissions. The service worker has one listener, for the shortcut, and Chrome stops it when idle. The palette is injected into the current tab only when the shortcut fires, using the access `activeTab` grants for that key press.
 
-Some browsers (Dia) grant nothing to a shortcut, so on a web page the palette first opens in its own window. Its top row, "Open Traveler over the page, not in a window", asks once for the optional access to websites (`http://*/*`, `https://*/*`). After that the palette opens over the page there too. Chrome, Brave, Edge and Arc never show that row.
+Some browsers (Dia) grant nothing to a shortcut, so on a web page the palette first opens in its own window. Its top row, "Open Traveler over the page, not in a window", opens Traveler's settings, whose "Allow Traveler on websites" button asks once for the optional access to websites (`http://*/*`, `https://*/*`). If the browser shows no prompt, the settings page links to the browser's extension page, where site access can be set by hand. After that the palette opens over the page there too. Chrome, Brave, Edge and Arc never show that row.
 
 ## Safety
 

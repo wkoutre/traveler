@@ -82,7 +82,7 @@ test('the manifest registers no always-on code', () => {
 });
 
 test('the manifest holds only permissions the code uses', () => {
-  const source = ['background.js', 'overlay.js', 'catalog.js', 'palette.js', 'options.js']
+  const source = ['background.js', 'overlay.js', 'access.js', 'catalog.js', 'palette.js', 'options.js']
     .map((f) => readFileSync(new URL(`../extension/src/${f}`, import.meta.url), 'utf8'))
     .join('\n');
   const evidence = {
@@ -105,7 +105,7 @@ test('the manifest holds only permissions the code uses', () => {
   };
   assert.deepEqual([...manifest.permissions].sort(), Object.keys(evidence).sort());
   for (const [permission, needle] of Object.entries(evidence)) assert.ok(source.includes(needle), permission);
-  assert.ok(source.includes('chrome.permissions.request(SITE_ACCESS)'), 'optional_host_permissions');
+  assert.ok(source.includes('permissions.request(SITE_ACCESS)'), 'optional_host_permissions');
 });
 
 test('only the palette page is web-accessible', () => {

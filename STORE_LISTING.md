@@ -57,6 +57,7 @@ Store search weighs the name most, then the summary, then the description. Name 
 - **Permission justifications:**
   - `activeTab`: Show the palette over the current page, only when the user presses the shortcut.
   - `scripting`: Insert the palette frame into the current page after the shortcut press that granted activeTab.
+  - Optional host access (`http://*/*`, `https://*/*`): never requested on Chrome. Some Chromium browsers grant activeTab to no keyboard shortcut; there the user can allow it from the palette so the palette opens over the current page instead of in a separate window. Used only to insert the palette frame after the shortcut.
   - `storage`: Save the user's theme, the palette's position and the learned result ranking, locally.
   - `tabs`: List, search, switch to, close, pin, mute, duplicate, reload and move the user's tabs from the palette.
   - `tabGroups`: Add tabs to groups, ungroup, collapse or expand groups, and group tabs by site.

@@ -74,16 +74,20 @@ test('"All time" deletes from the epoch', async () => {
 test('the manifest registers no always-on code', () => {
   assert.equal(manifest.content_scripts, undefined);
   assert.equal(manifest.host_permissions, undefined);
+  // Asked for only on browsers whose shortcut grants no activeTab (Dia), and only websites.
+  assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*']);
+  const overlay = readFileSync(new URL('../extension/src/overlay.js', import.meta.url), 'utf8');
+  assert.ok(overlay.includes("origins: ['http://*/*', 'https://*/*']"), 'SITE_ACCESS matches the manifest');
   assert.deepEqual(Object.keys(manifest.commands), ['open-palette']);
 });
 
 test('the manifest holds only permissions the code uses', () => {
-  const source = ['background.js', 'catalog.js', 'palette.js', 'options.js']
+  const source = ['background.js', 'overlay.js', 'catalog.js', 'palette.js', 'options.js']
     .map((f) => readFileSync(new URL(`../extension/src/${f}`, import.meta.url), 'utf8'))
     .join('\n');
   const evidence = {
-    activeTab: 'chrome.scripting.executeScript',
-    scripting: 'chrome.scripting.',
+    activeTab: 'scripting.executeScript',
+    scripting: '.scripting.',
     storage: 'chrome.storage.',
     tabs: 'chrome.tabs.',
     tabGroups: 'chrome.tabGroups.',
@@ -101,6 +105,7 @@ test('the manifest holds only permissions the code uses', () => {
   };
   assert.deepEqual([...manifest.permissions].sort(), Object.keys(evidence).sort());
   for (const [permission, needle] of Object.entries(evidence)) assert.ok(source.includes(needle), permission);
+  assert.ok(source.includes('chrome.permissions.request(SITE_ACCESS)'), 'optional_host_permissions');
 });
 
 test('only the palette page is web-accessible', () => {

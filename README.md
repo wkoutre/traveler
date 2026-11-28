@@ -8,7 +8,7 @@
 
 - **Free and open source.** MIT licensed. The code that runs is the code in this repo: plain JavaScript, Manifest V3, no dependencies, no build step.
 - **Private by design.** No servers, no analytics, no network requests of its own. See [PRIVACY.md](PRIVACY.md).
-- **Costs nothing while idle.** No content scripts, no host permissions; it wakes only when you press the shortcut.
+- **Costs nothing while idle.** No content scripts, no host permissions by default; it wakes only when you press the shortcut.
 
 Traveler is part of an open-source suite of keyboard-first Chrome extensions, alongside [Keyline](https://github.com/wkoutre/keyline) (keyboard shortcuts, a command palette and split inbox for Gmail).
 
@@ -67,6 +67,8 @@ Chrome has no extension API for menu-only features (Always Show Bookmarks Bar, T
 ## Cost while idle
 
 No content script is registered and the extension has no host permissions. The service worker has one listener, for the shortcut, and Chrome stops it when idle. The palette is injected into the current tab only when the shortcut fires, using the access `activeTab` grants for that key press.
+
+Some browsers (Dia) grant nothing to a shortcut, so on a web page the palette first opens in its own window. Its top row, "Open Traveler over the page, not in a window", asks once for the optional access to websites (`http://*/*`, `https://*/*`). After that the palette opens over the page there too. Chrome, Brave, Edge and Arc never show that row.
 
 ## Safety
 

@@ -3,6 +3,7 @@ import { arrange, cleanStore, emptyStore, keyOf, record } from './learn.js';
 import { PAGES, buildCommands, openTab, searchWeb, setHomeWindow, themeId } from './catalog.js';
 import { icon } from './icons.js';
 import { commandTab } from './origin.js';
+import { SITE_ACCESS, openOverlay } from './overlay.js';
 import { browserName, chromeSpelling, cleanVisited, rememberPages, settingsSearchUrl, visitedPages } from './browser.js';
 import { clampPanel, panelFractions, panelSpot, windowOffset, windowSpot } from './position.js';
 
@@ -60,6 +61,7 @@ const state = {
   reading: [],
   visited: [], // internal pages (brave://, edge://, ...) seen open, see browser.js
   commands: buildCommands(),
+  access: null, // the "allow access to websites" row, when this browser needs it
   searchSeq: 0,
 };
 
@@ -176,6 +178,51 @@ function prettyUrl(url = '') {
 // which the service worker passes along, and never lists itself.
 const originTabId = Number(new URLSearchParams(location.search).get('tab')) || null;
 let ownTabId = null;
+// Set by the service worker when the shortcut opened this window on a web page
+// only because the browser gave the key press no access to it (Dia does not
+// grant activeTab to shortcuts). Allowing access to websites fixes that for good.
+const noAccess = surface === 'window' && new URLSearchParams(location.search).get('access') === 'none';
+let asking = false;
+
+async function accessItem(tab) {
+  if (!noAccess || !/^https?:/.test(tab?.url || '')) return null;
+  if (await chrome.permissions.contains(SITE_ACCESS).catch(() => false)) return null;
+  const where = BROWSER_NAME || 'This browser';
+  return {
+    id: 'traveler.siteAccess',
+    kind: 'action',
+    section: 'Open over the page',
+    tag: 'Allow',
+    title: 'Open Traveler over the page, not in a window',
+    subtitle: `${where} keeps the shortcut out of pages. Allow websites once.`,
+    keywords: 'allow access websites overlay window permission inside page',
+    icon: 'shield',
+    run: allowSiteAccess,
+  };
+}
+
+async function allowSiteAccess() {
+  // The browser's permission prompt takes focus; the window must outlive it.
+  asking = true;
+  let granted = false;
+  try {
+    granted = await chrome.permissions.request(SITE_ACCESS);
+  } finally {
+    asking = false;
+  }
+  if (!granted) {
+    window.focus();
+    return { keep: true, message: 'Not allowed. Traveler keeps opening in a window on websites here.' };
+  }
+  state.access = null;
+  await chrome.storage.session.remove('paletteWindow');
+  // Move to the page right away; every later press opens there directly.
+  const tab = state.tab?.id ? await chrome.tabs.get(state.tab.id).catch(() => null) : null;
+  if (tab) {
+    await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+    await openOverlay(tab);
+  }
+}
 
 async function activeTab() {
   if (surface !== 'window') return (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
@@ -198,6 +245,7 @@ async function loadContext() {
   learned = cleanStore(saved.learned);
   learnedLoaded = true;
   state.tab = active || null;
+  state.access = await accessItem(state.tab);
   state.tabs = tabs
     .filter((t) => !(surface === 'tab' && t.url === location.href) && t.id !== ownTabId)
     .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))
@@ -221,7 +269,7 @@ async function loadContext() {
 }
 
 function localItems() {
-  return [...state.tabs, ...state.commands, ...PAGES, ...state.visited, ...state.closed, ...state.reading];
+  return [...(state.access ? [state.access] : []), ...state.tabs, ...state.commands, ...PAGES, ...state.visited, ...state.closed, ...state.reading];
 }
 
 function inScope(item) {
@@ -311,6 +359,7 @@ function emptyRows(local) {
     const suggested = starter.map((id) => state.commands.find((c) => c.id === id)).filter(Boolean);
     const settings = PAGES.slice(0, 1);
     return [
+      ...(state.access ? [{ item: state.access, positions: [], section: state.access.section }] : []),
       ...tabs.map((item) => ({ item, positions: [], section: 'Recent tabs' })),
       ...suggested.map((item) => ({ item, positions: [], section: 'Suggested' })),
       ...settings.map((item) => ({ item, positions: [], section: 'Suggested' })),
@@ -847,7 +896,7 @@ async function start() {
     return;
   }
   // Like Spotlight, the palette's own window goes away when focus leaves it.
-  if (surface === 'window') window.addEventListener('blur', close);
+  if (surface === 'window') window.addEventListener('blur', () => asking || close());
   $('search-icon').append(icon('search'));
   wire();
   wireDrag();

@@ -46,3 +46,34 @@ export function toggleOverlay(url) {
     return 'failed';
   }
 }
+
+// Websites the palette may be injected into without a key press granting
+// activeTab. Optional: requested only on browsers whose shortcut grants nothing.
+export const SITE_ACCESS = { origins: ['http://*/*', 'https://*/*'] };
+
+// Injects the palette into `tab`. Returns 'opened', 'closed', 'no-access'
+// (the browser gave this key press no access to the page, as Dia does) or
+// 'failed' (the page cannot be scripted at all: browser pages, the Web Store).
+export async function openOverlay(tab, api = chrome) {
+  if (!tab?.id) return 'failed';
+  try {
+    const token = crypto.randomUUID();
+    await api.storage.session.set({ [`overlay:${token}`]: true });
+    const url = `${api.runtime.getURL('src/palette.html')}?mode=overlay#${token}`;
+    const [injection] = await api.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: toggleOverlay,
+      args: [url],
+    });
+    const result = injection?.result;
+    return result === 'opened' || result === 'closed' ? result : 'failed';
+  } catch (error) {
+    return lacksAccess(error, tab) ? 'no-access' : 'failed';
+  }
+}
+
+// Chrome's refusal when the extension holds no access to the page, as opposed
+// to a page no extension may script. Only a web page can be fixed by access.
+export function lacksAccess(error, tab) {
+  return /^https?:/.test(tab?.url || '') && /must request permission|Cannot access contents of (the page|url)/i.test(String(error?.message || error));
+}

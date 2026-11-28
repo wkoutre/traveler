@@ -1,4 +1,4 @@
-import { toggleOverlay } from './overlay.js';
+import { openOverlay } from './overlay.js';
 import { WINDOW, windowSpot } from './position.js';
 import { commandTab } from './origin.js';
 
@@ -9,10 +9,13 @@ chrome.commands.onCommand.addListener(async (command, passed) => {
   // Dia fires the command without the tab; without one the overlay cannot be
   // injected and the palette window has no browser window to act on.
   const tab = await commandTab(passed);
-  if (await openOverlay(tab)) return;
+  const overlay = await openOverlay(tab);
+  if (overlay === 'opened' || overlay === 'closed') return;
   // The browser's own pages, the Web Store and the PDF viewer cannot be
   // scripted, so there the palette gets a small centered window of its own.
-  if (await toggleWindow(tab)) return;
+  // So does a web page the browser gave this key press no access to (Dia);
+  // the window then offers to allow access to websites.
+  if (await toggleWindow(tab, overlay === 'no-access')) return;
   try {
     await chrome.action.openPopup();
   } catch {
@@ -20,7 +23,7 @@ chrome.commands.onCommand.addListener(async (command, passed) => {
   }
 });
 
-async function toggleWindow(tab) {
+async function toggleWindow(tab, noAccess) {
   try {
     const { paletteWindow } = await chrome.storage.session.get('paletteWindow');
     if (paletteWindow) {
@@ -32,7 +35,11 @@ async function toggleWindow(tab) {
     const parent = tab?.windowId ? await chrome.windows.get(tab.windowId) : await chrome.windows.getLastFocused();
     const token = crypto.randomUUID();
     await chrome.storage.session.set({ [`overlay:${token}`]: true });
-    const query = new URLSearchParams({ mode: 'window', ...(tab?.id ? { tab: String(tab.id) } : {}) });
+    const query = new URLSearchParams({
+      mode: 'window',
+      ...(tab?.id ? { tab: String(tab.id) } : {}),
+      ...(noAccess ? { access: 'none' } : {}),
+    });
     const { positionWindow } = await chrome.storage.local.get('positionWindow');
     const frame = {
       url: `${chrome.runtime.getURL('src/palette.html')}?${query}#${token}`,
@@ -48,23 +55,6 @@ async function toggleWindow(tab) {
       .catch(() => chrome.windows.create({ ...frame, ...windowSpot(parent) }));
     await chrome.storage.session.set({ paletteWindow: created.id });
     return true;
-  } catch {
-    return false;
-  }
-}
-
-async function openOverlay(tab) {
-  if (!tab?.id) return false;
-  try {
-    const token = crypto.randomUUID();
-    await chrome.storage.session.set({ [`overlay:${token}`]: true });
-    const url = `${chrome.runtime.getURL('src/palette.html')}?mode=overlay#${token}`;
-    const [injection] = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: toggleOverlay,
-      args: [url],
-    });
-    return injection?.result === 'opened' || injection?.result === 'closed';
   } catch {
     return false;
   }
